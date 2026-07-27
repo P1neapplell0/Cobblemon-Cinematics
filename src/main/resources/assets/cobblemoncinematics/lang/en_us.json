@@ -1,0 +1,8 @@
+{
+  "cinematic.cobblemoncinematics.badge_obtained": "BADGE OBTAINED",
+  "key.categories.cobblemoncinematics": "Cobblemon Cinematics",
+  "key.cobblemoncinematics.toggle_battle_camera": "Toggle Battle Camera",
+  "message.cobblemoncinematics.battle_camera.disabled": "Battle camera disabled",
+  "message.cobblemoncinematics.battle_camera.enabled": "Battle camera enabled",
+  "screen.cobblemoncinematics.badge_cinematic": "Badge obtained"
+}

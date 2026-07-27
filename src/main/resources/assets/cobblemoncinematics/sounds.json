@@ -1,0 +1,8 @@
+{
+  "badge_get": {
+    "category": "player",
+    "sounds": [
+      "cobblemoncinematics:badge_get"
+    ]
+  }
+}
