@@ -1,8 +1,13 @@
 {
   "cinematic.cobblemoncinematics.badge_obtained": "获得徽章",
+  "cinematic.cobblemoncinematics.dynamax": "极巨化",
+  "cinematic.cobblemoncinematics.mega_evolution": "超级进化",
+  "cinematic.cobblemoncinematics.terastalization": "太晶化",
+  "cinematic.cobblemoncinematics.z_move": "Z力量",
   "key.categories.cobblemoncinematics": "Cobblemon Cinematics",
   "key.cobblemoncinematics.toggle_battle_camera": "切换战斗镜头",
   "message.cobblemoncinematics.battle_camera.disabled": "战斗镜头已关闭",
   "message.cobblemoncinematics.battle_camera.enabled": "战斗镜头已开启",
+  "message.cobblemoncinematics.battle_camera.hint": "按[%s]以开关战斗运镜",
   "screen.cobblemoncinematics.badge_cinematic": "获得徽章"
 }

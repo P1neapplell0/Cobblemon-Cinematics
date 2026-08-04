@@ -4,17 +4,21 @@ import com.cobblemon.mod.common.client.CobblemonClient
 import com.cobblemon.mod.common.client.battle.ClientBattleSide
 import com.cobblemon.mod.common.client.gui.battle.BattleGUI
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import com.p1nero.cceib.client.ClientBootstrap
+import com.p1nero.cceib.client.render.ProceduralDraw
 import com.p1nero.cceib.config.ClientConfig
 import net.minecraft.client.CameraType
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import net.minecraft.util.Mth
 import net.minecraft.world.phys.Vec3
+import net.neoforged.bus.api.EventPriority
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import net.neoforged.neoforge.client.event.ViewportEvent
 import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 object BattleCameraController {
     private const val SMOOTHING_RATE = 8.0
@@ -29,6 +33,7 @@ object BattleCameraController {
     private var orbitYaw = 0.0f
     private var lastFrameNanos = 0L
     private var previousCameraType: CameraType? = null
+    private var trackingAvailable = false
 
     fun toggle() {
         enabledByKey = !enabledByKey
@@ -84,6 +89,60 @@ object BattleCameraController {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    fun onScreenRender(event: ScreenEvent.Render.Post) {
+        if (
+            event.screen !is BattleGUI ||
+            !ClientConfig.battleCameraHint.get() ||
+            !isBattleCameraActive() ||
+            !trackingAvailable ||
+            BattleIntroController.isPlaying()
+        ) {
+            return
+        }
+
+        val graphics = event.guiGraphics
+        val minecraft = Minecraft.getInstance()
+        val width = graphics.guiWidth()
+        val height = graphics.guiHeight()
+        val text = Component.translatable(
+            "message.cobblemoncinematics.battle_camera.hint",
+            ClientBootstrap.battleCameraKeyName(),
+        )
+        val textWidth = minecraft.font.width(text)
+        val centerX = width / 2
+        val y = height - max(28, height / 9)
+        val padding = 8
+
+        graphics.pose().pushPose()
+        graphics.pose().translate(0.0f, 0.0f, 760.0f)
+        graphics.fill(
+            centerX - textWidth / 2 - padding,
+            y - 5,
+            centerX + textWidth / 2 + padding,
+            y + 14,
+            0xB80A0D12.toInt(),
+        )
+        graphics.fill(
+            centerX - textWidth / 2 - padding,
+            y - 5,
+            centerX + textWidth / 2 + padding,
+            y - 3,
+            0xFFE9C94A.toInt(),
+        )
+        ProceduralDraw.drawCenteredScaledString(
+            graphics,
+            minecraft.font,
+            text,
+            centerX,
+            y,
+            0xFFFFFFFF.toInt(),
+            (width * 0.82f).roundToInt(),
+            1.0f,
+        )
+        graphics.pose().popPose()
+    }
+
     @JvmStatic
     fun updateForFrame(
         partialTick: Float,
@@ -91,7 +150,7 @@ object BattleCameraController {
         fallbackYaw: Float,
         fallbackPitch: Float,
     ): CameraTransform? {
-        if (!isBattleCameraActive()) return null
+        if (!isBattleCameraActive() || !trackingAvailable) return null
 
         val now = System.nanoTime()
         val deltaSeconds = if (lastFrameNanos == 0L) {
@@ -121,7 +180,7 @@ object BattleCameraController {
 
     private fun desiredTransform(partialTick: Float): CameraTransform? {
         val attacker = attackerFocus(partialTick) ?: return null
-        val target = targetFocus(partialTick) ?: attacker
+        val target = targetFocus(partialTick) ?: return null
         val phaseTime = phaseTicks + partialTick
         return when (phase) {
             CameraPhase.ORBIT -> {
@@ -150,20 +209,29 @@ object BattleCameraController {
 
     private fun updateBattleEntities() {
         val minecraft = Minecraft.getInstance()
-        val player = minecraft.player ?: return
-        val level = minecraft.level ?: return
-        val battle = CobblemonClient.battle ?: return
+        val player = minecraft.player
+        val level = minecraft.level
+        val battle = CobblemonClient.battle
+        if (player == null || level == null || battle == null) {
+            trackingAvailable = false
+            if (current != null) reset()
+            return
+        }
         val playerSide = battle.sides.firstOrNull { side -> side.actors.any { it.uuid == player.uuid } }
         val opponentSide = battle.sides.firstOrNull { it !== playerSide }
         val pokemon = level.entitiesForRendering().filterIsInstance<PokemonEntity>().toList()
 
+        // Only follow the entities explicitly marked active by the battle state. A nearest-entity
+        // fallback can select an unrelated Pokemon after a faint and send the camera flying.
         val attacker = findActivePokemon(playerSide, pokemon)
-            ?: pokemon.minByOrNull { it.distanceToSqr(player) }
         val target = findActivePokemon(opponentSide, pokemon)
-            ?: pokemon.filter { it !== attacker }.minByOrNull { it.distanceToSqr(player) }
 
         attackerEntity = attacker
-        targetEntity = target ?: attacker
+        targetEntity = target
+        trackingAvailable = attacker != null && target != null
+        if (!trackingAvailable && current != null) {
+            reset()
+        }
     }
 
     private fun findActivePokemon(side: ClientBattleSide?, entities: List<PokemonEntity>): PokemonEntity? {
@@ -172,7 +240,9 @@ object BattleCameraController {
             ?.mapNotNull { it.battlePokemon?.uuid }
             ?.toSet()
             .orEmpty()
-        return entities.firstOrNull { it.pokemon.uuid in activeIds }
+        return entities.firstOrNull {
+            it.pokemon.uuid in activeIds && it.isAlive && !it.isRemoved
+        }
     }
 
     private fun attackerFocus(partialTick: Float): Vec3? = attackerEntity?.let { cameraFocus(it, partialTick) }
@@ -213,6 +283,7 @@ object BattleCameraController {
         phaseTicks = 0
         attackerEntity = null
         targetEntity = null
+        trackingAvailable = false
         current = null
         orbitYaw = 0.0f
         lastFrameNanos = 0L
@@ -226,7 +297,7 @@ object BattleCameraController {
     }
 
     @JvmStatic
-    fun currentTransform(): CameraTransform? = current.takeIf { isBattleCameraActive() }
+    fun currentTransform(): CameraTransform? = current.takeIf { isBattleCameraActive() && trackingAvailable }
 
     data class CameraTransform(
         val pivot: Vec3,

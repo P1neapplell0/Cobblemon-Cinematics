@@ -43,17 +43,25 @@ object BattleIntroController {
         if (battle.battleId == lastBattleId || battle.isPvW) return
         lastBattleId = battle.battleId
 
-        findOpponent(battle)?.let { opponent ->
-            val opponentName = findEntity(opponent.uuid)?.displayName?.copy()
-                ?: opponent.displayName.copy()
-            active = Intro(
-                opponent.uuid,
-                opponentName,
-                selectPalette(opponentName.string),
-                System.nanoTime(),
-            )
-            delayedSounds.clear()
-        }
+        val opponents = findOpponents(battle)
+            .take(MAX_RENDERED_TRAINERS)
+            .map { opponent ->
+                val opponentName = findEntity(opponent.uuid)?.displayName?.copy()
+                    ?: opponent.displayName.copy()
+                TrainerPresentation(
+                    opponent.uuid,
+                    opponentName,
+                    selectPalette(opponentName.string),
+                )
+            }
+        if (opponents.isEmpty()) return
+
+        active = Intro(
+            opponents,
+            selectPalette(opponents.joinToString("|") { it.name.string }),
+            System.nanoTime(),
+        )
+        delayedSounds.clear()
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
@@ -137,43 +145,60 @@ object BattleIntroController {
         val textEntrance = ProceduralDraw.easeOutCubic(((elapsed - 120L) / 520.0f).coerceIn(0.0f, 1.0f))
         val panelOffset = ((1.0f - textEntrance) * -width * 0.55f).toInt()
         val textX = width / 4 + panelOffset
-        ProceduralDraw.drawCenteredScaledString(
-            graphics,
-            minecraft.font,
-            intro.name,
-            textX,
-            dividerY - 17,
-            ProceduralDraw.withAlpha(palette.accent, alpha * textEntrance),
-            (width * 0.42f).roundToInt(),
-            1.54f,
-        )
-
-        findEntity(intro.opponentId)?.let { opponent ->
-            if (opponent is NPCEntity && !intro.ballAnimationStarted) {
-                opponent.playAnimation(
-                    NPCEntity.SEND_OUT_ANIMATION,
-                    listOf("v.actioning_pokemon_ball='cobblemon:poke_ball';"),
-                )
-                intro.ballAnimationStarted = true
-            }
-
-            val trainerEntrance = ProceduralDraw.easeOutBack(((elapsed - 80L) / 680.0f).coerceIn(0.0f, 1.0f))
-            val slide = ((1.0f - trainerEntrance) * width * 0.56f).roundToInt()
-            val poseBeat = if (elapsed in 1_000L..1_800L) {
-                sin((elapsed - 1_000L) / 800.0 * PI).toFloat()
-            } else {
-                0.0f
-            }
-            CinematicEffects.drawExpandingRing(
+        val trainerCount = intro.opponents.size
+        intro.opponents.forEachIndexed { index, presentation ->
+            val nameY = if (trainerCount == 1) dividerY - 17 else dividerY - 31 + index * 34
+            ProceduralDraw.drawCenteredScaledString(
                 graphics,
-                width * 3 / 4,
-                dividerY,
-                (elapsed - 180L) / 720.0f,
-                min(width, height) / 2,
-                palette.accent,
-                alpha * 0.64f,
+                minecraft.font,
+                presentation.name,
+                textX,
+                nameY,
+                ProceduralDraw.withAlpha(presentation.palette.accent, alpha * textEntrance),
+                (width * 0.42f).roundToInt(),
+                if (trainerCount == 1) 1.54f else 1.18f,
             )
-            renderTrainer(graphics, width, height, slide, poseBeat, elapsed, opponent)
+
+            findEntity(presentation.actorId)?.let { opponent ->
+                val localElapsed = elapsed - index * DOUBLE_INTRO_STAGGER_MS
+                if (opponent is NPCEntity && localElapsed >= 0L && !presentation.ballAnimationStarted) {
+                    opponent.playAnimation(
+                        NPCEntity.SEND_OUT_ANIMATION,
+                        listOf("v.actioning_pokemon_ball='cobblemon:poke_ball';"),
+                    )
+                    presentation.ballAnimationStarted = true
+                }
+
+                val trainerEntrance = ProceduralDraw.easeOutBack(((localElapsed - 80L) / 680.0f).coerceIn(0.0f, 1.0f))
+                val slide = ((1.0f - trainerEntrance) * width * 0.56f).roundToInt()
+                val poseBeat = if (localElapsed in 1_000L..1_800L) {
+                    sin((localElapsed - 1_000L) / 800.0 * PI).toFloat()
+                } else {
+                    0.0f
+                }
+                val modelLeft = if (trainerCount == 1) width / 2 else width / 2 + index * width / 4
+                val modelRight = if (trainerCount == 1) width else width / 2 + (index + 1) * width / 4
+                val modelCenter = (modelLeft + modelRight) / 2
+                CinematicEffects.drawExpandingRing(
+                    graphics,
+                    modelCenter,
+                    dividerY,
+                    (localElapsed - 180L) / 720.0f,
+                    if (trainerCount == 1) min(width, height) / 2 else min(width, height) / 3,
+                    presentation.palette.accent,
+                    alpha * 0.64f,
+                )
+                renderTrainer(
+                    graphics,
+                    modelLeft + slide,
+                    modelRight + slide,
+                    height,
+                    (min(width, height) * ((if (trainerCount == 1) 0.47f else 0.34f) + poseBeat * 0.04f)).roundToInt(),
+                    poseBeat,
+                    localElapsed,
+                    opponent,
+                )
+            }
         }
 
         val flashAlpha = when {
@@ -187,10 +212,10 @@ object BattleIntroController {
         graphics.pose().popPose()
     }
 
-    private fun findOpponent(battle: ClientBattle): ClientBattleActor? {
-        val playerId = Minecraft.getInstance().player?.uuid ?: return null
+    private fun findOpponents(battle: ClientBattle): List<ClientBattleActor> {
+        val playerId = Minecraft.getInstance().player?.uuid ?: return emptyList()
         val playerSide = battle.sides.firstOrNull { side -> side.actors.any { it.uuid == playerId } }
-        return battle.sides.firstOrNull { it !== playerSide }?.actors?.firstOrNull()
+        return battle.sides.firstOrNull { it !== playerSide }?.actors.orEmpty()
     }
 
     private fun findEntity(uuid: UUID): LivingEntity? = Minecraft.getInstance().level
@@ -199,9 +224,10 @@ object BattleIntroController {
 
     private fun renderTrainer(
         graphics: GuiGraphics,
-        width: Int,
+        left: Int,
+        right: Int,
         height: Int,
-        slide: Int,
+        modelScale: Int,
         poseBeat: Float,
         elapsed: Long,
         trainer: LivingEntity,
@@ -217,11 +243,11 @@ object BattleIntroController {
             }
             InventoryScreen.renderEntityInInventoryFollowsAngle(
                 graphics,
-                width / 2 + slide,
+                left,
                 0,
-                width + slide,
+                right,
                 height,
-                (min(width, height) * (0.47f + poseBeat * 0.04f)).roundToInt(),
+                modelScale,
                 -0.04f + poseBeat * 0.03f,
                 0.28f,
                 -0.04f,
@@ -253,15 +279,22 @@ object BattleIntroController {
         sounds.forEach(Minecraft.getInstance().soundManager::play)
     }
 
+    fun isPlaying(): Boolean = active != null
+
     private data class Intro(
-        val opponentId: UUID,
-        val name: Component,
+        val opponents: List<TrainerPresentation>,
         val palette: Palette,
         val startTime: Long,
-        var ballAnimationStarted: Boolean = false,
     ) {
         fun elapsedMs(): Long = (System.nanoTime() - startTime) / 1_000_000L
     }
+
+    private data class TrainerPresentation(
+        val actorId: UUID,
+        val name: Component,
+        val palette: Palette,
+        var ballAnimationStarted: Boolean = false,
+    )
 
     private data class Palette(val primary: Int, val secondary: Int, val accent: Int)
 
@@ -274,6 +307,8 @@ object BattleIntroController {
     private val ORANGE_MARKERS = listOf("fire", "magma", "flame")
     private val GREEN_MARKERS = listOf("grass", "leaf", "bug")
     private val SOUND_MARKERS = listOf("pokeball", "poke_ball", "cry", "send", "spawn")
+    private const val MAX_RENDERED_TRAINERS = 2
+    private const val DOUBLE_INTRO_STAGGER_MS = 90L
     private val POKE_BALL_ITEM by lazy {
         BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("cobblemon", "poke_ball"))
     }

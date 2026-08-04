@@ -1,8 +1,13 @@
 {
   "cinematic.cobblemoncinematics.badge_obtained": "BADGE OBTAINED",
+  "cinematic.cobblemoncinematics.dynamax": "DYNAMAX",
+  "cinematic.cobblemoncinematics.mega_evolution": "MEGA EVOLUTION",
+  "cinematic.cobblemoncinematics.terastalization": "TERASTALLIZATION",
+  "cinematic.cobblemoncinematics.z_move": "Z-POWER",
   "key.categories.cobblemoncinematics": "Cobblemon Cinematics",
   "key.cobblemoncinematics.toggle_battle_camera": "Toggle Battle Camera",
   "message.cobblemoncinematics.battle_camera.disabled": "Battle camera disabled",
   "message.cobblemoncinematics.battle_camera.enabled": "Battle camera enabled",
+  "message.cobblemoncinematics.battle_camera.hint": "Press [%s] to toggle the battle camera",
   "screen.cobblemoncinematics.badge_cinematic": "Badge obtained"
 }

@@ -7,7 +7,8 @@
   ],
   "client": [
     "client.CameraMixin",
-    "client.BattleGuiMixin"
+    "client.BattleGuiMixin",
+    "client.BattleMessageHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

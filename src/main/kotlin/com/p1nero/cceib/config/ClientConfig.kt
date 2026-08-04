@@ -17,6 +17,10 @@ object ClientConfig {
         .comment("Play a procedural introduction when a trainer battle screen opens.")
         .define("battleIntros", true)
 
+    val pauseDuringCinematics: ModConfigSpec.BooleanValue = builder
+        .comment("Pause the game world while a cinematic is playing when the active screen supports pausing.")
+        .define("pauseDuringCinematics", true)
+
     val delayBattleIntroSounds: ModConfigSpec.BooleanValue = builder
         .comment("Delay Pokemon send-out sounds until the battle introduction finishes.")
         .define("delayBattleIntroSounds", true)
@@ -28,6 +32,26 @@ object ClientConfig {
     val attackCamera: ModConfigSpec.BooleanValue = builder
         .comment("Temporarily focus the attacker and target after choosing a battle action.")
         .define("attackCamera", true)
+
+    val battleCameraHint: ModConfigSpec.BooleanValue = builder
+        .comment("Show the current battle-camera key binding near the bottom of the battle screen.")
+        .define("battleCameraHint", true)
+
+    val megaEvolutionCinematic: ModConfigSpec.BooleanValue = builder
+        .comment("Play the optional Mega Showdown cinematic when a Pokemon Mega Evolves.")
+        .define("megaEvolutionCinematic", true)
+
+    val dynamaxCinematic: ModConfigSpec.BooleanValue = builder
+        .comment("Play the optional Mega Showdown cinematic when a Pokemon Dynamaxes.")
+        .define("dynamaxCinematic", true)
+
+    val zMoveCinematic: ModConfigSpec.BooleanValue = builder
+        .comment("Play the optional Mega Showdown cinematic when a Pokemon uses Z-Power.")
+        .define("zMoveCinematic", true)
+
+    val terastalizationCinematic: ModConfigSpec.BooleanValue = builder
+        .comment("Play the optional Mega Showdown cinematic when a Pokemon Terastallizes.")
+        .define("terastalizationCinematic", true)
 
     val badgeCinematics: ModConfigSpec.BooleanValue = builder
         .comment("Play a procedural cinematic when a supported optional badge-mod item is obtained.")
