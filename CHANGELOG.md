@@ -2,6 +2,16 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.1.2] - 2026-08-06
+
+### Fixed
+
+- Fixed the badge acquisition sound playing at one quarter of its intended volume by passing the UI sound volume explicitly.
+
+### Verification
+
+- `./gradlew build` passes successfully.
+
 ## [1.1.1] - 2026-08-06
 
 ### Added
@@ -51,6 +61,11 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.1.2
+
+- 修复获得徽章音效实际以四分之一音量播放的问题，现在显式传入音量参数。
+- `./gradlew build` 构建通过。
 
 ### 1.1.1
 
