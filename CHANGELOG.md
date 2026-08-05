@@ -2,6 +2,21 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.1.1] - 2026-08-06
+
+### Added
+
+- Added the `pauseDuringCinematics` option to control whether supported cinematic screens pause the game world.
+
+### Fixed
+
+- Fixed the battle-camera key toggle not being handled reliably while the Cobblemon battle screen was focused.
+- Fixed duplicate Trainer panels when both double-battle participants resolve to the same NPC or player.
+
+### Verification
+
+- `./gradlew build` passes successfully.
+
 ## [1.1.0] - 2026-08-04
 
 ### Added
@@ -17,7 +32,6 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Added procedural badge-acquisition cinematics using the actual badge item model, code-drawn effects, screen overlay support, and configurable sound playback.
 - Added optional Mega Showdown compatibility for Mega Evolution, Dynamax, Z-Moves, and Terastallization cinematics.
 - Added independent client configuration toggles for each battle, badge, camera, and Mega Showdown feature.
-- Added the `pauseDuringCinematics` option to control whether supported cinematic screens pause the game world.
 - Added English and Simplified Chinese localization for the new controls, messages, and cinematic titles.
 - Added README documentation covering installation, configuration, compatibility, and development commands.
 
@@ -29,7 +43,6 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Fixed the final-frame cinematic text fade so titles do not briefly flash before disappearing.
 - Kept first-person player arms out of battle intro camera shots by switching to third person during the sequence.
 - Synchronized the second Trainer's NPC send-out animation with its delayed double-battle entrance.
-- Fixed the battle-camera key toggle not being handled reliably while the Cobblemon battle screen was focused.
 - Kept optional badge and Mega Showdown integrations from becoming hard dependencies.
 
 ### Verification
@@ -38,6 +51,13 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.1.1
+
+- 新增 `pauseDuringCinematics` 配置，可控制支持暂停的过场界面是否暂停游戏世界。
+- 修复战斗 Screen 获得焦点时按键无法稳定切换战斗运镜的问题。
+- 修复多人双打中同一 NPC 或玩家被重复渲染为两名训练师的问题。
+- `./gradlew build` 构建通过。
 
 ### 1.1.0
 
@@ -48,7 +68,5 @@ All notable changes to Cobblemon Cinematics are documented here.
 - 徽章匹配支持精确物品 ID、正则表达式和物品 Tag，Badge Box 与 Cobblemon Pokemon Badges 均为可选联动。
 - 新增使用真实徽章物品模型的程序化获得徽章演出。
 - 新增 Mega Showdown 可选联动，支持 Mega Evolution、Dynamax、Z-Moves 和 Terastalization 四类演出。
-- 新增 `pauseDuringCinematics` 配置，可控制支持暂停的过场界面是否暂停游戏世界。
 - 修复宝可梦倒下后的镜头乱飞、镜头插值、文字末帧闪烁及双打动画错位问题。
-- 修复战斗 Screen 获得焦点时按键无法稳定切换战斗运镜的问题。
 - `./gradlew clean build` 构建通过，并验证了有无可选联动模组两种客户端启动环境。

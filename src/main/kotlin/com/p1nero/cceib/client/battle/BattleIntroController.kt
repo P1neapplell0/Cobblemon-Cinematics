@@ -215,7 +215,13 @@ object BattleIntroController {
     private fun findOpponents(battle: ClientBattle): List<ClientBattleActor> {
         val playerId = Minecraft.getInstance().player?.uuid ?: return emptyList()
         val playerSide = battle.sides.firstOrNull { side -> side.actors.any { it.uuid == playerId } }
-        return battle.sides.firstOrNull { it !== playerSide }?.actors.orEmpty()
+        // An actor represents a trainer/entity, while activePokemon represents that trainer's
+        // individual send-outs. In multiplayer doubles the same actor can therefore appear more
+        // than once in packets; use the actor UUID so one trainer never becomes two intro panels.
+        return battle.sides.firstOrNull { it !== playerSide }
+            ?.actors
+            .orEmpty()
+            .distinctBy { it.uuid }
     }
 
     private fun findEntity(uuid: UUID): LivingEntity? = Minecraft.getInstance().level
