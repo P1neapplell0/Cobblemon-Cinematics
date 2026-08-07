@@ -47,10 +47,10 @@ Badge Box、Cobblemon Pokemon Badges 和 Mega Showdown 均为可选。徽章物�
 | `zMoveCinematic` | `true` | 启用可选的 Z力量演出 |
 | `terastalizationCinematic` | `true` | 启用可选的太晶化演出 |
 | `badgeCinematics` | `true` | 启用徽章获得演出 |
-| `badgeOncePerType` | `true` | 每种徽章只播放一次 |
+| `badgeOncePerType` | `true` | 每个存档/服务器和玩家的每种徽章只播放一次 |
 | `badgeSound` | `true` | 播放徽章获得音效 |
 | `badgeItemMatchers` | 见下方 | 定义哪些物品视为徽章 |
-| `obtainedBadgeIds` | `[]` | 已播放过的一次性徽章 ID |
+| 徽章进度文件 | `config/cobblemoncinematics-badges.json` | 按存档/服务器和玩家分别保存一次性徽章状态 |
 
 ### 徽章匹配规则
 
@@ -68,7 +68,7 @@ badgeItemMatchers = [
 - `regex:`：对完整的 `namespace:path` 进行正则表达式匹配。
 - `tag:`：匹配物品标签中的任意物品。
 
-修改规则后 NeoForge 会重新加载客户端配置。清空 `obtainedBadgeIds` 可重新播放已经看过的徽章演出。
+修改规则后 NeoForge 会重新加载客户端配置。一次性徽章进度按存档/服务器和玩家分别保存，因此新存档会独立触发徽章演出。删除 `config/cobblemoncinematics-badges.json` 可清除本地全部进度。
 
 ## 操作
 

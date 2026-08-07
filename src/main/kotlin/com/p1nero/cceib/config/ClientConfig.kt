@@ -58,7 +58,7 @@ object ClientConfig {
         .define("badgeCinematics", true)
 
     val badgeOncePerType: ModConfigSpec.BooleanValue = builder
-        .comment("Only play each badge cinematic once until obtainedBadgeIds is cleared.")
+        .comment("Only play each badge cinematic once per save/server and player.")
         .define("badgeOncePerType", true)
 
     val badgeSound: ModConfigSpec.BooleanValue = builder
@@ -79,26 +79,7 @@ object ClientConfig {
             ::isValidBadgeMatcher,
         )
 
-    private val obtainedBadgeIds: ModConfigSpec.ConfigValue<List<String>> = builder
-        .comment("Badge item IDs whose one-time cinematic has already played. Clear this list to replay them.")
-        .defineListAllowEmpty(
-            "obtainedBadgeIds",
-            emptyList<String>(),
-            { "minecraft:diamond" },
-        ) { it is String && ResourceLocation.tryParse(it) != null }
-
     val SPEC: ModConfigSpec = builder.build()
-
-    fun hasSeenBadge(id: String): Boolean = obtainedBadgeIds.get().contains(id)
-
-    fun markBadgeSeen(id: String) {
-        if (hasSeenBadge(id)) return
-
-        obtainedBadgeIds.set(obtainedBadgeIds.get() + id)
-        if (SPEC.isLoaded) {
-            SPEC.save()
-        }
-    }
 
     private fun isValidBadgeMatcher(value: Any): Boolean {
         if (value !is String) return false

@@ -47,10 +47,10 @@ The client configuration is stored in `config/cobblemoncinematics-client.toml`.
 | `zMoveCinematic` | `true` | Enables the optional Z-Power presentation |
 | `terastalizationCinematic` | `true` | Enables the optional Terastallization presentation |
 | `badgeCinematics` | `true` | Enables badge acquisition cinematics |
-| `badgeOncePerType` | `true` | Plays the cinematic only once for each badge type |
+| `badgeOncePerType` | `true` | Plays the cinematic only once for each badge type per save/server and player |
 | `badgeSound` | `true` | Plays the badge acquisition sound |
 | `badgeItemMatchers` | See below | Defines which items are treated as badges |
-| `obtainedBadgeIds` | `[]` | Stores badge IDs whose one-time cinematic has already played |
+| Badge progress file | `config/cobblemoncinematics-badges.json` | Stores one-time badge state separately for each save/server and player |
 
 ### Badge Matching Rules
 
@@ -68,7 +68,7 @@ badgeItemMatchers = [
 - `regex:` matches a regular expression against the complete `namespace:path` ID.
 - `tag:` matches any item in the specified item tag.
 
-NeoForge reloads the client configuration after the rules are changed. Clear `obtainedBadgeIds` to replay cinematics for badges that have already been shown.
+NeoForge reloads the client configuration after the rules are changed. One-time badge progress is stored per save/server and player, so a new save starts with its own badge presentations. Delete `config/cobblemoncinematics-badges.json` to clear all local progress.
 
 ## Controls
 

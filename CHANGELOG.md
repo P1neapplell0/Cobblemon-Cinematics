@@ -2,6 +2,16 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.1.3] - 2026-08-06
+
+### Fixed
+
+- Isolated one-time badge cinematic progress per singleplayer save or multiplayer server and player, so badges obtained in one save no longer suppress the cinematic in another save.
+
+### Verification
+
+- `./gradlew build` passes successfully.
+
 ## [1.1.2] - 2026-08-06
 
 ### Fixed
@@ -61,6 +71,11 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.1.3
+
+- 将一次性徽章演出进度按单人存档或多人服务器及玩家分别保存，避免旧存档的徽章状态阻止新存档播放特效。
+- `./gradlew build` 构建通过。
 
 ### 1.1.2
 

@@ -44,10 +44,10 @@ object BadgeInventoryTracker {
 
     private fun onBadgeObtained(id: ResourceLocation, stack: ItemStack) {
         if (!ClientConfig.badgeCinematics.get()) return
-        if (ClientConfig.badgeOncePerType.get() && ClientConfig.hasSeenBadge(id.toString())) return
+        if (ClientConfig.badgeOncePerType.get() && BadgeProgressStore.hasSeen(id.toString())) return
 
         if (ClientConfig.badgeOncePerType.get()) {
-            ClientConfig.markBadgeSeen(id.toString())
+            BadgeProgressStore.markSeen(id.toString())
         }
         BadgeCinematicManager.enqueue(id, stack.hoverName.copy(), stack)
     }
