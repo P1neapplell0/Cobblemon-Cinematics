@@ -9,9 +9,10 @@ Cobblemon Cinematics 是一个面向 Minecraft 1.21.1、NeoForge 和 Cobblemon 1
 - **训练师对战开场**：进入 Cobblemon 训练师战斗时播放宝可梦风格的高速背景、闪切、训练师名称和 NPC 模型演出。
 - **双打战斗开场**：对方阵营存在两位训练家时，使用专用分栏布局同时显示两位 NPC 模型、名称和出战动画。
 - **训练师持球动画**：Cobblemon NPC 使用自身的 `send_out` 骨骼动画和精灵球物品挂点；其他训练师实体使用兼容回退动画。
-- **战斗镜头**：围绕双方出战宝可梦平滑运镜，并在选择招式后依次聚焦攻击方和目标。
+- **战斗镜头**：根据全部出战宝可梦的碰撞箱体型、当前 FOV 和屏幕宽高比自动构图，并在选择招式后依次聚焦攻击方和目标。
 - **动态运镜提示**：自动运镜工作时显示当前实际绑定的镜头开关键。
-- **相机碰撞**：镜头距离使用 Minecraft 原生相机碰撞检测缩短，避免穿入墙体或方块。
+- **过场音效**：复用 Cobblemon 与 Minecraft 的现有音效事件，为战斗开场、超级进化、极巨化、Z力量和太晶化提供音效，不额外打包宝可梦原游戏音频。
+- **相机碰撞**：按净空与主体可见性评估多个偏航和俯仰机位，再以 Minecraft 原生相机碰撞作为最终防穿墙保护。
 - **徽章获得演出**：获得匹配物品时播放程序化金色背景、粒子、光环、真实物品模型和获得音效。
 - **窗口兼容**：没有打开 Screen 时使用暂停界面播放；已有 Screen 时只在最上层绘制，不阻止原界面交互。
 - **可选模组兼容**：不依赖任何特定徽章模组。默认配置可识别 Badge Box 和 Cobblemon Pokemon Badges，也能匹配整合包自定义物品。
@@ -36,28 +37,35 @@ Badge Box、Cobblemon Pokemon Badges 和 Mega Showdown 均为可选。徽章物�
 
 | 配置项 | 默认值 | 作用 |
 | --- | --- | --- |
-| `battleIntros` | `true` | 启用训练师对战开场 |
-| `pauseDuringCinematics` | `true` | 播放过场时在当前界面支持暂停的情况下暂停游戏世界 |
-| `delayBattleIntroSounds` | `true` | 将出战与叫声音效延迟到开场结束 |
-| `battleCamera` | `true` | 启用动态战斗镜头 |
-| `attackCamera` | `true` | 选择行动后聚焦攻击方与目标 |
-| `battleCameraHint` | `true` | 自动运镜时显示实际绑定的镜头开关键 |
-| `megaEvolutionCinematic` | `true` | 启用可选的超级进化演出 |
-| `dynamaxCinematic` | `true` | 启用可选的极巨化演出 |
-| `zMoveCinematic` | `true` | 启用可选的 Z力量演出 |
-| `terastalizationCinematic` | `true` | 启用可选的太晶化演出 |
-| `badgeCinematics` | `true` | 启用徽章获得演出 |
-| `badgeOncePerType` | `true` | 每个存档/服务器和玩家的每种徽章只播放一次 |
-| `badgeSound` | `true` | 播放徽章获得音效 |
-| `badgeItemMatchers` | 见下方 | 定义哪些物品视为徽章 |
+| `general.pauseDuringCinematics` | `true` | 播放过场时在当前界面支持暂停的情况下暂停游戏世界 |
+| `battleIntro.trainerEnabled` | `true` | 启用训练师对战开场 |
+| `battleIntro.trainerNpcWhitelist` | `["*"]` | 允许播放训练师开场的 NPC 资源 ID；空列表或 `*` 表示允许全部 NPC |
+| `battleIntro.trainerNpcBlacklist` | `[]` | 禁止播放训练师开场的 NPC 资源 ID；优先级高于白名单 |
+| `battleIntro.wildPokemonWhitelist` | 神兽 ID | 播放野生开场的物种 ID；默认使用配置内置的神兽与幻兽列表 |
+| `battleIntro.wildPokemonBlacklist` | `[]` | 禁止播放野生开场的物种 ID；优先级高于白名单 |
+| `battleIntro.delayPokemonSounds` | `true` | 将出战与叫声音效延迟到开场结束 |
+| `battleCamera.enabled` | `true` | 启用动态战斗镜头 |
+| `battleCamera.attackFocus` | `true` | 选择行动后聚焦攻击方与目标 |
+| `battleCamera.hint` | `true` | 自动运镜时显示实际绑定的镜头开关键 |
+| `megaShowdown.megaEvolution` | `true` | 启用可选的超级进化演出 |
+| `megaShowdown.dynamax` | `true` | 启用可选的极巨化演出 |
+| `megaShowdown.zMove` | `true` | 启用可选的 Z力量演出 |
+| `megaShowdown.terastalization` | `true` | 启用可选的太晶化演出 |
+| `badges.enabled` | `true` | 启用徽章获得演出 |
+| `badges.oncePerType` | `true` | 每个存档/服务器和玩家的每种徽章只播放一次 |
+| `badges.sound` | `true` | 播放徽章获得音效 |
+| `badges.itemMatchers` | 见下方 | 定义哪些物品视为徽章 |
 | 徽章进度文件 | `config/cobblemoncinematics-badges.json` | 按存档/服务器和玩家分别保存一次性徽章状态 |
+
+开场黑白名单使用 `cobblemon:mew` 这类完整资源 ID。黑名单始终优先；白名单为空或包含 `*` 时允许全部 ID，黑名单包含 `*` 时禁止全部 ID。野生开场不再有单独开关，由宝可梦黑白名单直接决定哪些物种播放。
 
 ### 徽章匹配规则
 
-`badgeItemMatchers` 支持三种规则：
+`badges.itemMatchers` 支持三种规则：
 
 ```toml
-badgeItemMatchers = [
+[badges]
+itemMatchers = [
   "item:examplemod:league_badge",
   "regex:^examplemod:[a-z0-9_]+_badge$",
   "tag:examplemod:badges"
@@ -73,6 +81,22 @@ badgeItemMatchers = [
 ## 操作
 
 - `V`：在战斗中临时启用或关闭动态镜头，可在 Minecraft 控制设置中重新绑定。
+
+### 过场测试命令
+
+以下客户端命令可在进入任意世界后直接从聊天栏执行。命令会打开独立测试界面并播放完整过场，包括模型、程序化特效、标题和音效：
+
+```text
+/cobblemoncinematics test battle_intro
+/cobblemoncinematics test badge
+/cobblemoncinematics test mega
+/cobblemoncinematics test dynamax
+/cobblemoncinematics test zmove
+/cobblemoncinematics test terastalization
+/cobblemoncinematics test all
+```
+
+训练师开场使用本地玩家作为测试训练师，徽章测试使用临时下界之星，特殊机制测试在没有战斗宝可梦时渲染仅客户端存在的皮卡丘。显式测试命令会绕过功能开关，也不要求安装 Mega Showdown，因为它们只测试本模组自身的演出层；真实战斗中的自动触发仍仅在安装 Mega Showdown 后可用，并遵守各自的配置项。`all` 会依次播放全部测试过场。
 
 ## 构建
 

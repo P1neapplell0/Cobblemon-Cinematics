@@ -11,17 +11,23 @@ object MegaShowdownCompat {
 
     fun initialize() {
         loaded = ModList.get().isLoaded(MOD_ID)
-        if (!loaded) return
-
         NeoForge.EVENT_BUS.register(MegaShowdownCinematicManager)
-        CobblemonCinematicsMod.LOGGER.info("Mega Showdown cinematic compatibility enabled")
+        if (loaded) {
+            CobblemonCinematicsMod.LOGGER.info("Mega Showdown cinematic compatibility enabled")
+        }
     }
 
     fun tick() {
-        if (loaded) MegaShowdownCinematicManager.tick()
+        MegaShowdownCinematicManager.tick()
     }
 
-    fun isPlaying(): Boolean = loaded && MegaShowdownCinematicManager.isPlaying()
+    fun isPlaying(): Boolean = MegaShowdownCinematicManager.isPlaying()
+
+    fun debugPlay(kind: String): Boolean = MegaShowdownCinematicManager.debugPlay(kind)
+
+    fun stopTest() {
+        MegaShowdownCinematicManager.stopTest()
+    }
 
     @JvmStatic
     fun onBattleMessages(messages: List<Component>) {

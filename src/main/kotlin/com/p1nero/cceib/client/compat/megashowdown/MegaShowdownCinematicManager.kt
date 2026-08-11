@@ -2,7 +2,12 @@ package com.p1nero.cceib.client.compat.megashowdown
 
 import com.cobblemon.mod.common.client.CobblemonClient
 import com.cobblemon.mod.common.client.gui.battle.BattleGUI
+import com.cobblemon.mod.common.CobblemonEntities
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import com.cobblemon.mod.common.pokemon.Pokemon
+import com.p1nero.cceib.client.CinematicTestScreen
+import com.p1nero.cceib.client.audio.CinematicSoundPlayer
 import com.p1nero.cceib.client.render.CinematicEffects
 import com.p1nero.cceib.client.render.ProceduralDraw
 import com.p1nero.cceib.config.ClientConfig
@@ -49,7 +54,8 @@ object MegaShowdownCinematicManager {
 
     fun tick() {
         recentlyQueued.entries.removeIf { elapsedSince(it.value) > DEDUPE_MS }
-        if (Minecraft.getInstance().screen !is BattleGUI) {
+        val screen = Minecraft.getInstance().screen
+        if (screen !is BattleGUI && screen !is CinematicTestScreen) {
             clear()
             return
         }
@@ -60,23 +66,47 @@ object MegaShowdownCinematicManager {
 
     fun isPlaying(): Boolean = active != null
 
+    fun stopTest() = clear()
+
+    fun debugPlay(kind: String): Boolean {
+        val screen = Minecraft.getInstance().screen
+        if (screen !is BattleGUI && screen !is CinematicTestScreen) return false
+        val type = GimmickType.fromDebugName(kind) ?: return false
+
+        val debugEntity = createDebugPokemon()
+        enqueue(
+            type,
+            debugEntity?.name ?: Component.literal("Test Pokemon"),
+            null,
+            debugEntity,
+        )
+        return true
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     fun onScreenRender(event: ScreenEvent.Render.Post) {
-        if (event.screen is BattleGUI && active != null) render(event.guiGraphics)
+        if ((event.screen is BattleGUI || event.screen is CinematicTestScreen) && active != null) {
+            render(event.guiGraphics)
+        }
     }
 
     @SubscribeEvent
     fun onScreenClosing(event: ScreenEvent.Closing) {
-        if (event.screen is BattleGUI) clear()
+        if (event.screen is BattleGUI || event.screen is CinematicTestScreen) clear()
     }
 
-    private fun enqueue(type: GimmickType, pokemonName: Component, pokemonId: UUID?) {
+    private fun enqueue(
+        type: GimmickType,
+        pokemonName: Component,
+        pokemonId: UUID?,
+        debugEntity: PokemonEntity? = null,
+    ) {
         val key = "${type.name}:${pokemonId ?: pokemonName.string.lowercase()}"
         val now = System.nanoTime()
         if (recentlyQueued[key]?.let { elapsedSince(it) <= DEDUPE_MS } == true) return
 
         recentlyQueued[key] = now
-        queue.addLast(Presentation(type, pokemonName.copy(), pokemonId))
+        queue.addLast(Presentation(type, pokemonName.copy(), pokemonId, debugEntity))
         if (active == null) startNext()
     }
 
@@ -424,6 +454,7 @@ object MegaShowdownCinematicManager {
     }
 
     private fun findPokemonEntity(presentation: Presentation): PokemonEntity? {
+        presentation.debugEntity?.let { return it }
         val entities = Minecraft.getInstance().level
             ?.entitiesForRendering()
             ?.filterIsInstance<PokemonEntity>()
@@ -438,6 +469,16 @@ object MegaShowdownCinematicManager {
         }
     }
 
+    private fun createDebugPokemon(): PokemonEntity? {
+        val level = Minecraft.getInstance().level ?: return null
+        val species = PokemonSpecies.getByName("pikachu") ?: return null
+        val pokemon = Pokemon().apply {
+            this.species = species
+            this.level = 50
+        }
+        return PokemonEntity(level, pokemon, CobblemonEntities.POKEMON)
+    }
+
     private fun Any?.toComponent(): Component = when (this) {
         is Component -> copy()
         null -> Component.empty()
@@ -447,6 +488,9 @@ object MegaShowdownCinematicManager {
     private fun startNext() {
         active = queue.pollFirst() ?: return
         startedAt = System.nanoTime()
+        active?.let { presentation ->
+            CinematicSoundPlayer.playSequence(GIMMICK_SOUND_GROUP, presentation.type.soundCues())
+        }
     }
 
     private fun finishCurrent() {
@@ -458,6 +502,7 @@ object MegaShowdownCinematicManager {
         queue.clear()
         active = null
         recentlyQueued.clear()
+        CinematicSoundPlayer.cancel(GIMMICK_SOUND_GROUP)
     }
 
     private fun elapsedMs(): Long = (System.nanoTime() - startedAt) / 1_000_000L
@@ -468,6 +513,7 @@ object MegaShowdownCinematicManager {
         val type: GimmickType,
         val pokemonName: Component,
         val pokemonId: UUID?,
+        val debugEntity: PokemonEntity? = null,
     )
 
     private data class Palette(val primary: Int, val secondary: Int, val accent: Int)
@@ -475,22 +521,37 @@ object MegaShowdownCinematicManager {
     private enum class GimmickType(
         val translationKey: String,
         val palette: Palette,
+        val soundId: String,
+        val soundVolume: Float,
+        val soundPitch: Float,
     ) {
         MEGA_EVOLUTION(
             "cinematic.cobblemoncinematics.mega_evolution",
             Palette(0xFF8C2BCB.toInt(), 0xFF142A68.toInt(), 0xFFFF68DF.toInt()),
+            "cobblemon:evolution.full",
+            0.92f,
+            1.08f,
         ),
         DYNAMAX(
             "cinematic.cobblemoncinematics.dynamax",
             Palette(0xFFB3133B.toInt(), 0xFF2A0714.toInt(), 0xFFFF668A.toInt()),
+            "minecraft:block.beacon.activate",
+            0.9f,
+            0.68f,
         ),
         Z_MOVE(
             "cinematic.cobblemoncinematics.z_move",
             Palette(0xFFD69B05.toInt(), 0xFF2F2305.toInt(), 0xFFFFE45C.toInt()),
+            "minecraft:block.amethyst_block.chime",
+            0.82f,
+            1.35f,
         ),
         TERASTALIZATION(
             "cinematic.cobblemoncinematics.terastalization",
             Palette(0xFFB64CC8.toInt(), 0xFF164A67.toInt(), 0xFF8FF5FF.toInt()),
+            "cobblemon:evolution.notification",
+            0.88f,
+            1.18f,
         ),
         ;
 
@@ -501,7 +562,43 @@ object MegaShowdownCinematicManager {
             TERASTALIZATION -> ClientConfig.terastalizationCinematic.get()
         }
 
+        fun soundCues(): List<CinematicSoundPlayer.Cue> {
+            val opening = CinematicSoundPlayer.Cue(0L, soundId, soundVolume, soundPitch)
+            return when (this) {
+                MEGA_EVOLUTION -> listOf(
+                    opening,
+                    CinematicSoundPlayer.Cue(620L, "minecraft:block.amethyst_block.resonate", 0.9f, 1.28f),
+                    CinematicSoundPlayer.Cue(1_260L, "cobblemon:impact.psychic", 1.0f, 0.86f),
+                )
+                DYNAMAX -> listOf(
+                    opening,
+                    CinematicSoundPlayer.Cue(420L, "minecraft:block.portal.trigger", 0.72f, 0.62f),
+                    CinematicSoundPlayer.Cue(1_280L, "cobblemon:impact.dragon", 1.0f, 0.72f),
+                )
+                Z_MOVE -> listOf(
+                    CinematicSoundPlayer.Cue(0L, "cobblemon:evolution.notification", 1.0f, 1.28f),
+                    CinematicSoundPlayer.Cue(180L, "cobblemon:move.swordsdance.actor", 1.05f, 0.82f),
+                    CinematicSoundPlayer.Cue(640L, "cobblemon:move.thunderwave.actor", 1.0f, 1.12f),
+                    CinematicSoundPlayer.Cue(980L, "minecraft:block.amethyst_block.resonate", 1.0f, 1.34f),
+                    CinematicSoundPlayer.Cue(1_360L, "cobblemon:impact.fairy", 1.15f, 0.82f),
+                )
+                TERASTALIZATION -> listOf(
+                    opening,
+                    CinematicSoundPlayer.Cue(560L, "minecraft:block.amethyst_block.resonate", 1.0f, 1.38f),
+                    CinematicSoundPlayer.Cue(1_240L, "cobblemon:impact.ice", 0.9f, 1.12f),
+                )
+            }
+        }
+
         companion object {
+            fun fromDebugName(name: String): GimmickType? = when (name.lowercase()) {
+                "mega", "mega_evolution" -> MEGA_EVOLUTION
+                "dynamax" -> DYNAMAX
+                "zmove", "z_move", "z-power" -> Z_MOVE
+                "tera", "terastalization", "terastallization" -> TERASTALIZATION
+                else -> null
+            }
+
             fun fromMessageKey(key: String): GimmickType? = when (key) {
                 "cobblemon.battle.mega" -> MEGA_EVOLUTION
                 "cobblemon.battle.start.dynamax" -> DYNAMAX
@@ -511,4 +608,6 @@ object MegaShowdownCinematicManager {
             }
         }
     }
+
+    private const val GIMMICK_SOUND_GROUP = "mega_showdown_gimmick"
 }

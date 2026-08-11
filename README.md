@@ -9,9 +9,10 @@ Cobblemon Cinematics is a client-side cinematic mod for Minecraft 1.21.1, NeoFor
 - **Trainer battle intros**: Plays a Pokemon-inspired sequence with high-speed backgrounds, flashes, the Trainer's name, and an animated NPC model when a Cobblemon Trainer battle begins.
 - **Double-battle intros**: When the opposing side contains two Trainers, both NPC models, names, and send-out animations are presented in a dedicated split layout.
 - **Trainer Poke Ball animation**: Cobblemon NPCs use their own `send_out` skeletal animation and Poke Ball item attachment. Other Trainer entities use a compatible fallback animation.
-- **Battle camera**: Smoothly orbits the active Pokemon on both sides and focuses on the attacker and target after a move is selected.
+- **Battle camera**: Frames all active Pokemon using their bounding-box size, the current FOV and display aspect ratio, then focuses on the attacker and target after a move is selected.
 - **Dynamic camera hint**: Shows the currently bound camera-toggle key during automatic camera operation.
-- **Camera collision**: Uses Minecraft's native camera collision detection to shorten camera distance and prevent clipping into walls or blocks.
+- **Cinematic audio**: Reuses Cobblemon and Minecraft sound events for battle introductions, Mega Evolution, Dynamax, Z-Power, and Terastallization without bundling copyrighted Pokémon game audio.
+- **Camera collision**: Scores alternate yaw and pitch positions for clearance and subject visibility, then uses Minecraft's native collision detection as the final wall-clipping safeguard.
 - **Badge acquisition cinematic**: Plays a procedural golden backdrop, particles, rings, the actual badge item model, and an acquisition sound when a matching item is obtained.
 - **Screen compatibility**: Pauses the game and opens a dedicated screen when no screen is active. If another screen is already open, the cinematic renders above it without blocking its interaction.
 - **Optional mod compatibility**: Does not depend on a specific badge mod. The default configuration recognizes Badge Box and Cobblemon Pokemon Badges items and can also match custom modpack items.
@@ -36,28 +37,35 @@ The client configuration is stored in `config/cobblemoncinematics-client.toml`.
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `battleIntros` | `true` | Enables Trainer battle intros |
-| `pauseDuringCinematics` | `true` | Pauses the game world while a cinematic is playing when the active screen supports pausing |
-| `delayBattleIntroSounds` | `true` | Delays send-out and cry sounds until the intro finishes |
-| `battleCamera` | `true` | Enables the dynamic battle camera |
-| `attackCamera` | `true` | Focuses on the attacker and target after an action is selected |
-| `battleCameraHint` | `true` | Shows the actual bound camera-toggle key during automatic camera operation |
-| `megaEvolutionCinematic` | `true` | Enables the optional Mega Evolution presentation |
-| `dynamaxCinematic` | `true` | Enables the optional Dynamax presentation |
-| `zMoveCinematic` | `true` | Enables the optional Z-Power presentation |
-| `terastalizationCinematic` | `true` | Enables the optional Terastallization presentation |
-| `badgeCinematics` | `true` | Enables badge acquisition cinematics |
-| `badgeOncePerType` | `true` | Plays the cinematic only once for each badge type per save/server and player |
-| `badgeSound` | `true` | Plays the badge acquisition sound |
-| `badgeItemMatchers` | See below | Defines which items are treated as badges |
+| `general.pauseDuringCinematics` | `true` | Pauses the game world while a cinematic is playing when the active screen supports pausing |
+| `battleIntro.trainerEnabled` | `true` | Enables Trainer battle intros |
+| `battleIntro.trainerNpcWhitelist` | `["*"]` | NPC resource IDs allowed to play Trainer intros; empty or `*` allows all NPCs |
+| `battleIntro.trainerNpcBlacklist` | `[]` | NPC resource IDs blocked from Trainer intros; takes priority over the whitelist |
+| `battleIntro.wildPokemonWhitelist` | Legendary IDs | Species IDs that receive wild intros; defaults to the configured legendary and mythical list |
+| `battleIntro.wildPokemonBlacklist` | `[]` | Species IDs blocked from wild intros; takes priority over the whitelist |
+| `battleIntro.delayPokemonSounds` | `true` | Delays send-out and cry sounds until the intro finishes |
+| `battleCamera.enabled` | `true` | Enables the dynamic battle camera |
+| `battleCamera.attackFocus` | `true` | Focuses on the attacker and target after an action is selected |
+| `battleCamera.hint` | `true` | Shows the actual bound camera-toggle key during automatic camera operation |
+| `megaShowdown.megaEvolution` | `true` | Enables the optional Mega Evolution presentation |
+| `megaShowdown.dynamax` | `true` | Enables the optional Dynamax presentation |
+| `megaShowdown.zMove` | `true` | Enables the optional Z-Power presentation |
+| `megaShowdown.terastalization` | `true` | Enables the optional Terastallization presentation |
+| `badges.enabled` | `true` | Enables badge acquisition cinematics |
+| `badges.oncePerType` | `true` | Plays the cinematic only once for each badge type per save/server and player |
+| `badges.sound` | `true` | Plays the badge acquisition sound |
+| `badges.itemMatchers` | See below | Defines which items are treated as badges |
 | Badge progress file | `config/cobblemoncinematics-badges.json` | Stores one-time badge state separately for each save/server and player |
+
+Intro whitelist and blacklist entries use complete resource IDs such as `cobblemon:mew`. Blacklists always take priority. An empty whitelist or a whitelist containing `*` allows every ID; a blacklist containing `*` blocks every ID. Wild intros have no separate toggle: the Pokemon lists directly determine which species receive them.
 
 ### Badge Matching Rules
 
-`badgeItemMatchers` supports three rule types:
+`badges.itemMatchers` supports three rule types:
 
 ```toml
-badgeItemMatchers = [
+[badges]
+itemMatchers = [
   "item:examplemod:league_badge",
   "regex:^examplemod:[a-z0-9_]+_badge$",
   "tag:examplemod:badges"
@@ -73,6 +81,22 @@ NeoForge reloads the client configuration after the rules are changed. One-time 
 ## Controls
 
 - `V`: Temporarily enables or disables the dynamic camera during battle. This key can be rebound in Minecraft's control settings.
+
+### Cinematic Test Commands
+
+These client commands can be run from chat anywhere in a loaded world. They open an isolated test screen and replay the complete visual cinematic, including its model rendering, procedural effects, title, and sound:
+
+```text
+/cobblemoncinematics test battle_intro
+/cobblemoncinematics test badge
+/cobblemoncinematics test mega
+/cobblemoncinematics test dynamax
+/cobblemoncinematics test zmove
+/cobblemoncinematics test terastalization
+/cobblemoncinematics test all
+```
+
+The intro uses the local player as a test Trainer, the badge test uses a temporary Nether Star, and gimmick tests render a client-only Pikachu when no battle Pokémon exists. Explicit test commands bypass feature toggles and do not require Mega Showdown because they only exercise this mod's presentation layer; automatic triggering from real battles remains available only when Mega Showdown is installed and respects every corresponding configuration option. `all` plays every test cinematic sequentially.
 
 ## Building
 

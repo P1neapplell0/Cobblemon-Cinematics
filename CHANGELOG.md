@@ -2,6 +2,47 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.2.0] - 2026-08-11
+
+### Added
+
+- Added wild-Pokemon battle introductions using the actual opposing Pokemon models and names. Species whitelists and blacklists directly control which wild encounters receive an intro, with legendary and mythical species selected by default.
+- Added Trainer NPC intro whitelists and blacklists based on `NPCEntity.resourceIdentifier`; all NPCs are allowed by default and blacklists take priority.
+- Added complete client-side test commands for Trainer intros, badge acquisition, Mega Evolution, Dynamax, Z-Moves, Terastallization, and sequential playback. Tests use simulated Trainer, item, and Pokemon inputs and do not require a battle GUI or Mega Showdown installation.
+- Added layered, timed sound sequences for Trainer intros and all optional Mega Showdown presentations using existing Minecraft and Cobblemon sound events.
+
+### Changed
+
+- Reorganized the client configuration into `general`, `battleIntro`, `battleCamera`, `megaShowdown`, and `badges` TOML groups. Existing flat 1.1.x configuration keys are replaced with grouped defaults and must be customized again after upgrading.
+- Removed the separate `wildBattleIntros` toggle; `battleIntro.wildPokemonWhitelist` and `battleIntro.wildPokemonBlacklist` are now the sole controls for wild intros.
+- Reworked battle-camera framing around all active Pokemon using their bounding boxes, current FOV, display aspect ratio, and the actual framing pivot.
+- Added environment-aware camera positioning that scores alternate yaw and pitch candidates for clearance and subject visibility while retaining Minecraft's native collision rays as the final safeguard.
+- Made collision pull-back smooth while keeping inward collision response immediate, reducing camera popping without allowing wall clipping.
+- Scaled intro models to their allocated screen region using entity width and height so oversized Pokemon remain fully visible in single and double presentations.
+- Normalized the badge-acquisition audio from approximately -29.7 LUFS to -14.0 LUFS while retaining peak headroom.
+
+### Fixed
+
+- Kept the dynamic-camera key hint visible during battles even when the camera is disabled, allowing players to discover how to re-enable it.
+- Prevented the battle-intro sound-delay filter from swallowing the cinematic's own audio and replaced the inaudible Z-Move cue with a multi-stage activation sequence.
+- Fixed wild battles entering the Trainer-intro path and producing an empty presentation without a Pokemon model.
+- Continued tracking a fainted Pokemon while its exact UUID remains in the rendered entity list. When one side disappears, the camera never falls back to nearby or name-matched Pokemon, preventing end-of-battle camera flight.
+
+### Verification
+
+- `./gradlew build` and `git diff --check` pass successfully.
+- Client initialization and automatic grouped-config correction were verified without Badge Box, Cobblemon Pokemon Badges, Mega Showdown, or Accessories installed.
+
+## [1.1.4] - 2026-08-06
+
+### Fixed
+
+- Restricted the battle-camera toggle key to active Cobblemon battle screens, preventing chat and unrelated screens from changing camera state.
+
+### Verification
+
+- `./gradlew build` passes successfully.
+
 ## [1.1.3] - 2026-08-06
 
 ### Fixed
@@ -71,6 +112,28 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.2.0
+
+- 新增野生宝可梦战斗开场，渲染实际对方模型与名称；由物种黑白名单直接控制，默认白名单为神兽与幻兽。
+- 新增基于 `NPCEntity.resourceIdentifier` 的训练师 NPC 黑白名单，NPC 默认全部允许，黑名单优先。
+- 新增训练师开场、徽章、超级进化、极巨化、Z力量、太晶化及连续播放的完整客户端测试命令；使用模拟参数，不要求战斗 GUI 或安装 Mega Showdown。
+- 使用 Minecraft 与 Cobblemon 现有声音事件，为训练师开场和四种特殊机制加入分阶段音效。
+- 将客户端配置整理为 `general`、`battleIntro`、`battleCamera`、`megaShowdown` 和 `badges` 五个 TOML 分组；升级后旧版扁平配置会被分组默认值替换，需要重新应用自定义设置。
+- 移除独立的 `wildBattleIntros`，改由 `battleIntro.wildPokemonWhitelist` 与 `battleIntro.wildPokemonBlacklist` 完全控制野生开场。
+- 战斗镜头根据全部 active Pokémon 的碰撞箱、当前 FOV、屏幕比例和实际焦点自动构图，并评估多个偏航、俯仰机位的净空与主体可见性。
+- 保留 Minecraft 原生碰撞射线作为最终保护；撞墙立即收近，离墙平滑拉远。
+- 开场模型按实体宽高与分配区域动态缩放，避免大型宝可梦在单打或双打画面中显示不完整。
+- 将徽章获得音频从约 -29.7 LUFS 归一化至 -14.0 LUFS，并保留峰值余量。
+- 在运镜关闭时继续显示动态按键提示，方便玩家发现如何重新启用运镜。
+- 修复开场音效被延迟逻辑误拦截、Z 招式提示音不明显，以及野生战斗错误进入训练师开场的问题。
+- 宝可梦倒下后，只要同 UUID 模型仍在渲染列表中就继续跟踪；一方消失时不会匹配附近或同名实体，避免战斗结束阶段镜头乱飞。
+- `./gradlew build` 与 `git diff --check` 通过，并验证了无全部可选联动模组时的客户端初始化及分组配置自动修正。
+
+### 1.1.4
+
+- 将战斗运镜开关键限制在 Cobblemon 战斗界面，避免在聊天或其他非战斗窗口输入时误触发。
+- `./gradlew build` 构建通过。
 
 ### 1.1.3
 

@@ -5,6 +5,9 @@ import com.cobblemon.mod.common.client.battle.ClientBattle
 import com.cobblemon.mod.common.client.battle.ClientBattleActor
 import com.cobblemon.mod.common.client.gui.battle.BattleGUI
 import com.cobblemon.mod.common.entity.npc.NPCEntity
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import com.p1nero.cceib.client.CinematicTestScreen
+import com.p1nero.cceib.client.audio.CinematicSoundPlayer
 import com.p1nero.cceib.client.render.CinematicEffects
 import com.p1nero.cceib.client.render.ProceduralDraw
 import com.p1nero.cceib.config.ClientConfig
@@ -37,36 +40,58 @@ object BattleIntroController {
 
     @SubscribeEvent
     fun onScreenOpening(event: ScreenEvent.Opening) {
-        if (event.newScreen !is BattleGUI || !ClientConfig.battleIntros.get()) return
-
+        if (event.newScreen !is BattleGUI) return
         val battle = CobblemonClient.battle ?: return
-        if (battle.battleId == lastBattleId || battle.isPvW) return
+        if (!battle.isPvW && !ClientConfig.battleIntros.get()) return
+        beginIntro(battle)
+    }
+
+    fun debugReplay(): Boolean {
+        val battle = CobblemonClient.battle ?: return false
+        if (Minecraft.getInstance().screen !is BattleGUI || !ClientConfig.battleIntros.get() || battle.isPvW) return false
+        return beginIntro(battle, force = true)
+    }
+
+    fun debugStandalone(): Boolean {
+        val player = Minecraft.getInstance().player ?: return false
+        val name = Component.literal("Test Trainer")
+        active = Intro(
+            listOf(ParticipantPresentation(player.uuid, name, selectPalette(name.string))),
+            selectPalette(name.string),
+            System.nanoTime(),
+            isWild = false,
+        )
+        delayedSounds.clear()
+        playIntroAudio(isWild = false)
+        return true
+    }
+
+    fun stopTest() {
+        if (active != null) finish()
+    }
+
+    private fun beginIntro(battle: ClientBattle, force: Boolean = false): Boolean {
+        if (!force && battle.battleId == lastBattleId) return false
         lastBattleId = battle.battleId
 
-        val opponents = findOpponents(battle)
-            .take(MAX_RENDERED_TRAINERS)
-            .map { opponent ->
-                val opponentName = findEntity(opponent.uuid)?.displayName?.copy()
-                    ?: opponent.displayName.copy()
-                TrainerPresentation(
-                    opponent.uuid,
-                    opponentName,
-                    selectPalette(opponentName.string),
-                )
-            }
-        if (opponents.isEmpty()) return
+        val isWild = battle.isPvW
+        val opponents = if (isWild) findWildPokemon(battle) else findTrainerPresentations(battle)
+        if (opponents.isEmpty()) return false
 
         active = Intro(
             opponents,
             selectPalette(opponents.joinToString("|") { it.name.string }),
             System.nanoTime(),
+            isWild,
         )
         delayedSounds.clear()
+        playIntroAudio(isWild)
+        return true
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     fun onScreenRender(event: ScreenEvent.Render.Post) {
-        if (event.screen !is BattleGUI) return
+        if (event.screen !is BattleGUI && event.screen !is CinematicTestScreen) return
         val intro = active ?: return
         val elapsed = intro.elapsedMs()
         if (elapsed >= DURATION_MS) {
@@ -99,7 +124,11 @@ object BattleIntroController {
 
     @SubscribeEvent
     fun onSound(event: PlaySoundEvent) {
-        if (active == null || !ClientConfig.delayBattleIntroSounds.get()) return
+        if (
+            active == null ||
+            CinematicSoundPlayer.isDispatching() ||
+            !ClientConfig.delayBattleIntroSounds.get()
+        ) return
         val path = event.originalSound.location.path.lowercase()
         if (SOUND_MARKERS.any(path::contains)) {
             delayedSounds += event.originalSound
@@ -159,9 +188,9 @@ object BattleIntroController {
                 if (trainerCount == 1) 1.54f else 1.18f,
             )
 
-            findEntity(presentation.actorId)?.let { opponent ->
+            findParticipantEntity(presentation.entityId, intro.isWild)?.let { opponent ->
                 val localElapsed = elapsed - index * DOUBLE_INTRO_STAGGER_MS
-                if (opponent is NPCEntity && localElapsed >= 0L && !presentation.ballAnimationStarted) {
+                if (!intro.isWild && opponent is NPCEntity && localElapsed >= 0L && !presentation.ballAnimationStarted) {
                     opponent.playAnimation(
                         NPCEntity.SEND_OUT_ANIMATION,
                         listOf("v.actioning_pokemon_ball='cobblemon:poke_ball';"),
@@ -188,7 +217,7 @@ object BattleIntroController {
                     presentation.palette.accent,
                     alpha * 0.64f,
                 )
-                renderTrainer(
+                renderParticipant(
                     graphics,
                     modelLeft + slide,
                     modelRight + slide,
@@ -197,6 +226,7 @@ object BattleIntroController {
                     poseBeat,
                     localElapsed,
                     opponent,
+                    useTrainerPose = !intro.isWild,
                 )
             }
         }
@@ -224,11 +254,69 @@ object BattleIntroController {
             .distinctBy { it.uuid }
     }
 
+    private fun findTrainerPresentations(battle: ClientBattle): List<ParticipantPresentation> =
+        findOpponents(battle)
+            .mapNotNull { opponent ->
+                val entity = findEntity(opponent.uuid)
+                val npcIdentifier = (entity as? NPCEntity)?.resourceIdentifier
+                if (entity == null && !BattleIntroFilters.allowsNpc(null)) return@mapNotNull null
+                if (entity is NPCEntity && !BattleIntroFilters.allowsNpc(npcIdentifier)) return@mapNotNull null
+
+                val opponentName = entity?.displayName?.copy()
+                    ?: opponent.displayName.copy()
+                ParticipantPresentation(
+                    opponent.uuid,
+                    opponentName,
+                    selectPalette(opponentName.string),
+                )
+            }
+            .take(MAX_RENDERED_TRAINERS)
+
+    private fun findWildPokemon(battle: ClientBattle): List<ParticipantPresentation> {
+        val activePokemon = findOpponents(battle)
+            .flatMap { it.activePokemon }
+            .mapNotNull { it.battlePokemon }
+            .distinctBy { it.uuid }
+            .filter { BattleIntroFilters.allowsPokemon(it.species.resourceIdentifier) }
+            .take(MAX_RENDERED_TRAINERS)
+            .map { pokemon ->
+                val pokemonName = pokemon.displayName
+                ParticipantPresentation(
+                    pokemon.uuid,
+                    pokemonName.copy(),
+                    selectPalette(pokemonName.string),
+                )
+            }
+        if (activePokemon.isNotEmpty()) return activePokemon
+
+        return findOpponents(battle)
+            .flatMap { it.pokemon }
+            .distinctBy { it.uuid }
+            .filter { BattleIntroFilters.allowsPokemon(it.species.resourceIdentifier) }
+            .take(MAX_RENDERED_TRAINERS)
+            .map { pokemon ->
+                val pokemonName = pokemon.nickname ?: pokemon.species.translatedName
+                ParticipantPresentation(
+                    pokemon.uuid,
+                    pokemonName.copy(),
+                    selectPalette(pokemonName.string),
+                )
+            }
+    }
+
     private fun findEntity(uuid: UUID): LivingEntity? = Minecraft.getInstance().level
         ?.entitiesForRendering()
         ?.firstOrNull { it.uuid == uuid && it is LivingEntity } as? LivingEntity
 
-    private fun renderTrainer(
+    private fun findParticipantEntity(uuid: UUID, isWild: Boolean): LivingEntity? {
+        if (!isWild) return findEntity(uuid)
+        return Minecraft.getInstance().level
+            ?.entitiesForRendering()
+            ?.filterIsInstance<PokemonEntity>()
+            ?.firstOrNull { it.pokemon.uuid == uuid }
+    }
+
+    private fun renderParticipant(
         graphics: GuiGraphics,
         left: Int,
         right: Int,
@@ -236,16 +324,24 @@ object BattleIntroController {
         modelScale: Int,
         poseBeat: Float,
         elapsed: Long,
-        trainer: LivingEntity,
+        participant: LivingEntity,
+        useTrainerPose: Boolean,
     ) {
-        val originalHand = trainer.mainHandItem
-        val originalAttackAnim = trainer.attackAnim
-        val originalOldAttackAnim = trainer.oAttackAnim
+        val availableWidth = (right - left).coerceAtLeast(1)
+        val availableHeight = height.coerceAtLeast(1)
+        val fittedScale = min(
+            availableWidth * 0.72f / participant.bbWidth.coerceAtLeast(0.35f),
+            availableHeight * 0.72f / participant.bbHeight.coerceAtLeast(0.6f),
+        ).roundToInt().coerceAtLeast(1)
+        val finalScale = min(modelScale, fittedScale)
+        val originalHand = participant.mainHandItem
+        val originalAttackAnim = participant.attackAnim
+        val originalOldAttackAnim = participant.oAttackAnim
         try {
-            if (trainer !is NPCEntity && elapsed <= 1_450L) {
-                trainer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack(POKE_BALL_ITEM))
-                trainer.attackAnim = poseBeat
-                trainer.oAttackAnim = poseBeat
+            if (useTrainerPose && participant !is NPCEntity && elapsed <= 1_450L) {
+                participant.setItemInHand(InteractionHand.MAIN_HAND, ItemStack(POKE_BALL_ITEM))
+                participant.attackAnim = poseBeat
+                participant.oAttackAnim = poseBeat
             }
             InventoryScreen.renderEntityInInventoryFollowsAngle(
                 graphics,
@@ -253,17 +349,17 @@ object BattleIntroController {
                 0,
                 right,
                 height,
-                modelScale,
+                finalScale,
                 -0.04f + poseBeat * 0.03f,
                 0.28f,
                 -0.04f,
-                trainer,
+                participant,
             )
         } finally {
-            if (trainer !is NPCEntity) {
-                trainer.setItemInHand(InteractionHand.MAIN_HAND, originalHand)
-                trainer.attackAnim = originalAttackAnim
-                trainer.oAttackAnim = originalOldAttackAnim
+            if (useTrainerPose && participant !is NPCEntity) {
+                participant.setItemInHand(InteractionHand.MAIN_HAND, originalHand)
+                participant.attackAnim = originalAttackAnim
+                participant.oAttackAnim = originalOldAttackAnim
             }
         }
     }
@@ -280,6 +376,7 @@ object BattleIntroController {
 
     private fun finish() {
         active = null
+        CinematicSoundPlayer.cancel(INTRO_SOUND_GROUP)
         val sounds = delayedSounds.toList()
         delayedSounds.clear()
         sounds.forEach(Minecraft.getInstance().soundManager::play)
@@ -287,16 +384,40 @@ object BattleIntroController {
 
     fun isPlaying(): Boolean = active != null
 
+    private fun playIntroAudio(isWild: Boolean) {
+        val cues = if (isWild) {
+            listOf(
+                CinematicSoundPlayer.Cue(0L, "cobblemon:move.quickattack.actor", 1.0f, 0.72f),
+                CinematicSoundPlayer.Cue(60L, "minecraft:entity.ender_dragon.flap", 0.48f, 1.55f),
+                CinematicSoundPlayer.Cue(260L, "minecraft:entity.warden.sonic_boom", 0.46f, 1.6f),
+            )
+        } else {
+            listOf(
+                CinematicSoundPlayer.Cue(0L, "cobblemon:move.quickattack.actor", 1.0f, 0.72f),
+                CinematicSoundPlayer.Cue(60L, "minecraft:entity.ender_dragon.flap", 0.48f, 1.55f),
+                CinematicSoundPlayer.Cue(260L, "minecraft:entity.warden.sonic_boom", 0.46f, 1.6f),
+                CinematicSoundPlayer.Cue(610L, "cobblemon:poke_ball.throw", 1.25f, 0.9f),
+                CinematicSoundPlayer.Cue(820L, "cobblemon:poke_ball.trail", 1.05f, 1.08f),
+                CinematicSoundPlayer.Cue(1_120L, "cobblemon:poke_ball.send_out", 1.2f, 0.96f),
+            )
+        }
+        CinematicSoundPlayer.playSequence(
+            INTRO_SOUND_GROUP,
+            cues,
+        )
+    }
+
     private data class Intro(
-        val opponents: List<TrainerPresentation>,
+        val opponents: List<ParticipantPresentation>,
         val palette: Palette,
         val startTime: Long,
+        val isWild: Boolean,
     ) {
         fun elapsedMs(): Long = (System.nanoTime() - startTime) / 1_000_000L
     }
 
-    private data class TrainerPresentation(
-        val actorId: UUID,
+    private data class ParticipantPresentation(
+        val entityId: UUID,
         val name: Component,
         val palette: Palette,
         var ballAnimationStarted: Boolean = false,
@@ -315,6 +436,7 @@ object BattleIntroController {
     private val SOUND_MARKERS = listOf("pokeball", "poke_ball", "cry", "send", "spawn")
     private const val MAX_RENDERED_TRAINERS = 2
     private const val DOUBLE_INTRO_STAGGER_MS = 90L
+    private const val INTRO_SOUND_GROUP = "battle_intro"
     private val POKE_BALL_ITEM by lazy {
         BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("cobblemon", "poke_ball"))
     }

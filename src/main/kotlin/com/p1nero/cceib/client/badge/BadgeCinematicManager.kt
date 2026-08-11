@@ -12,6 +12,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.util.Mth
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import net.neoforged.bus.api.EventPriority
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
@@ -32,6 +33,7 @@ object BadgeCinematicManager {
     private val queue = ArrayDeque<BadgePresentation>()
     private var active: BadgePresentation? = null
     private var startedAt = 0L
+    private var testing = false
 
     fun enqueue(id: ResourceLocation, name: Component, stack: ItemStack) {
         queue.addLast(BadgePresentation(id, name, stack.copyWithCount(1)))
@@ -40,8 +42,23 @@ object BadgeCinematicManager {
         }
     }
 
+    fun debugPlay(): Boolean {
+        testing = true
+        val stack = ItemStack(Items.NETHER_STAR)
+        enqueue(
+            ResourceLocation.fromNamespaceAndPath("cobblemoncinematics", "test_badge"),
+            Component.literal("Test Badge"),
+            stack,
+        )
+        return true
+    }
+
+    fun isPlaying(): Boolean = active != null
+
+    fun stopTest() = stopAll()
+
     fun tick() {
-        if (!ClientConfig.badgeCinematics.get()) {
+        if (!testing && !ClientConfig.badgeCinematics.get()) {
             stopAll()
             return
         }
@@ -248,6 +265,7 @@ object BadgeCinematicManager {
             startNext()
             return
         }
+        testing = false
 
         val minecraft = Minecraft.getInstance()
         if (minecraft.screen is BadgeCinematicScreen) {
@@ -258,6 +276,7 @@ object BadgeCinematicManager {
     private fun stopAll() {
         queue.clear()
         active = null
+        testing = false
         val minecraft = Minecraft.getInstance()
         if (minecraft.screen is BadgeCinematicScreen) {
             minecraft.setScreen(null)

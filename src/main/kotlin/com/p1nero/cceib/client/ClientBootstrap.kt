@@ -1,6 +1,7 @@
 package com.p1nero.cceib.client
 
 import com.mojang.blaze3d.platform.InputConstants
+import com.p1nero.cceib.client.audio.CinematicSoundPlayer
 import com.p1nero.cceib.client.badge.BadgeCinematicManager
 import com.p1nero.cceib.client.badge.BadgeInventoryTracker
 import com.p1nero.cceib.client.battle.BattleCameraController
@@ -27,6 +28,7 @@ object ClientBootstrap {
     fun initialize(modBus: IEventBus) {
         modBus.addListener(::registerKeyMappings)
         NeoForge.EVENT_BUS.register(this)
+        NeoForge.EVENT_BUS.register(ClientCinematicCommands)
         NeoForge.EVENT_BUS.register(BadgeCinematicManager)
         NeoForge.EVENT_BUS.register(BattleIntroController)
         NeoForge.EVENT_BUS.register(BattleCameraController)
@@ -39,15 +41,21 @@ object ClientBootstrap {
 
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Post) {
+        CinematicSoundPlayer.tick()
         BadgeInventoryTracker.tick()
         BadgeCinematicManager.tick()
         BattleCameraController.tick()
         MegaShowdownCompat.tick()
+        CinematicTestController.tick()
     }
 
     @SubscribeEvent
     fun onKeyInput(event: InputEvent.Key) {
-        if (event.action == GLFW.GLFW_PRESS && toggleBattleCamera.matches(event.key, event.scanCode)) {
+        if (
+            event.action == GLFW.GLFW_PRESS &&
+            toggleBattleCamera.matches(event.key, event.scanCode) &&
+            BattleCameraController.canToggle()
+        ) {
             BattleCameraController.toggle()
         }
     }

@@ -49,6 +49,7 @@ public abstract class CameraMixin {
         setPosition(transform.getPivot());
         setRotation(transform.getYaw(), transform.getPitch());
         float safeDistance = cobblemoncinematics$getMaxZoom(transform.getDistance());
-        move(-safeDistance, 0.0F, 0.0F);
+        float resolvedDistance = BattleCameraController.resolveCollisionDistance(safeDistance);
+        move(-resolvedDistance, 0.0F, 0.0F);
     }
 }
