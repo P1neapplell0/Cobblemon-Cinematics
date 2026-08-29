@@ -1,10 +1,15 @@
 package com.p1nero.cceib.client.compat.megashowdown
 
 import com.cobblemon.mod.common.client.CobblemonClient
+import com.cobblemon.mod.common.client.entity.PokemonClientDelegate
+import com.cobblemon.mod.common.client.entity.NPCClientDelegate
 import com.cobblemon.mod.common.client.gui.battle.BattleGUI
 import com.cobblemon.mod.common.CobblemonEntities
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies
+import com.cobblemon.mod.common.entity.npc.NPCEntity
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import com.cobblemon.mod.common.client.render.models.blockbench.animation.ActiveAnimation
+import com.cobblemon.mod.common.client.render.models.blockbench.animation.PrimaryAnimation
 import com.cobblemon.mod.common.pokemon.Pokemon
 import com.p1nero.cceib.client.CinematicTestScreen
 import com.p1nero.cceib.client.audio.CinematicSoundPlayer
@@ -12,15 +17,24 @@ import com.p1nero.cceib.client.render.CinematicEffects
 import com.p1nero.cceib.client.render.ProceduralDraw
 import com.p1nero.cceib.config.ClientConfig
 import net.minecraft.client.Minecraft
+import net.minecraft.client.model.PlayerModel
+import net.minecraft.client.model.geom.ModelLayers
+import net.minecraft.client.model.geom.ModelPart
+import net.minecraft.client.player.AbstractClientPlayer
+import net.minecraft.client.renderer.entity.LivingEntityRenderer
+import net.minecraft.client.resources.PlayerSkin
+import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.EventPriority
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ScreenEvent
 import java.util.ArrayDeque
 import java.util.UUID
+import net.minecraft.world.entity.LivingEntity
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -30,10 +44,30 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 object MegaShowdownCinematicManager {
-    private const val DURATION_MS = 3_350L
+    private const val DURATION_MS = 5_600L
     private const val ENTER_MS = 420L
     private const val EXIT_MS = 560L
     private const val DEDUPE_MS = 4_000L
+    private const val TRAINER_RISE_MS = 520L
+    private const val TRAINER_VICTORY_START_MS = 480L
+    private const val TRAINER_RETREAT_START_MS = 1_500L
+    private const val TRAINER_RETREAT_MS = 520L
+    // The Pokemon appears only after the trainer has finished its victory presentation.
+    private const val POKEMON_REVEAL_START_MS = TRAINER_RETREAT_START_MS + TRAINER_RETREAT_MS
+    private const val POKEMON_REVEAL_MS = 620L
+    // Start the battle cry as soon as the Pokemon enters its reveal phase. The animation's own
+    // sound keyframe then fires shortly after the model appears, as it does in a normal battle.
+    private const val POKEMON_CRY_START_MS = POKEMON_REVEAL_START_MS
+
+    private val modelField by lazy {
+        LivingEntityRenderer::class.java.getDeclaredField("model").apply { isAccessible = true }
+    }
+    private val victoryModels = mutableMapOf<Boolean, VictoryPosePlayerModel>()
+
+    private fun victoryModel(slim: Boolean): VictoryPosePlayerModel = victoryModels.getOrPut(slim) {
+        val layer = if (slim) ModelLayers.PLAYER_SLIM else ModelLayers.PLAYER
+        VictoryPosePlayerModel(Minecraft.getInstance().entityModels.bakeLayer(layer), slim)
+    }
 
     private val queue = ArrayDeque<Presentation>()
     private val recentlyQueued = mutableMapOf<String, Long>()
@@ -68,12 +102,12 @@ object MegaShowdownCinematicManager {
 
     fun stopTest() = clear()
 
-    fun debugPlay(kind: String): Boolean {
+    fun debugPlay(kind: String, pokemonId: String? = null): Boolean {
         val screen = Minecraft.getInstance().screen
         if (screen !is BattleGUI && screen !is CinematicTestScreen) return false
         val type = GimmickType.fromDebugName(kind) ?: return false
 
-        val debugEntity = createDebugPokemon()
+        val debugEntity = createDebugPokemon(pokemonId)
         enqueue(
             type,
             debugEntity?.name ?: Component.literal("Test Pokemon"),
@@ -106,7 +140,9 @@ object MegaShowdownCinematicManager {
         if (recentlyQueued[key]?.let { elapsedSince(it) <= DEDUPE_MS } == true) return
 
         recentlyQueued[key] = now
-        queue.addLast(Presentation(type, pokemonName.copy(), pokemonId, debugEntity))
+        queue.addLast(
+            Presentation(type, pokemonName.copy(), pokemonId, debugEntity, findTrainerId(pokemonId)),
+        )
         if (active == null) startNext()
     }
 
@@ -120,7 +156,9 @@ object MegaShowdownCinematicManager {
         val enter = ProceduralDraw.easeOutCubic((elapsed.toFloat() / ENTER_MS).coerceIn(0.0f, 1.0f))
         val exit = ((DURATION_MS - elapsed).toFloat() / EXIT_MS).coerceIn(0.0f, 1.0f)
         val alpha = min(enter, exit)
-        val reveal = ProceduralDraw.easeOutBack(((elapsed - 180L) / 720.0f).coerceIn(0.0f, 1.0f))
+        val reveal = ProceduralDraw.easeOutBack(
+            ((elapsed - POKEMON_REVEAL_START_MS) / POKEMON_REVEAL_MS.toFloat()).coerceIn(0.0f, 1.0f),
+        )
         val palette = presentation.type.palette
 
         graphics.pose().pushPose()
@@ -136,9 +174,171 @@ object MegaShowdownCinematicManager {
         findPokemonEntity(presentation)?.let { entity ->
             renderPokemon(graphics, width, height, centerY, elapsed, reveal, exit, presentation.type, entity)
         }
+        tickPokemonAnimation(presentation, elapsed)
+        updatePokemonAnimation(presentation, elapsed)
+        // Draw the trainer after the Pokemon so the player/NPC presentation remains the
+        // front-most subject while the Pokemon stays above the procedural backdrop.
+        renderTrainer(graphics, width, height, elapsed, presentation)
+        updateTrainerAnimation(presentation, elapsed)
         drawTitles(graphics, width, height, elapsed, alpha, presentation)
         drawRevealFlash(graphics, width, height, elapsed)
         graphics.pose().popPose()
+    }
+
+    private fun updateTrainerAnimation(presentation: Presentation, elapsed: Long) {
+        if (elapsed !in TRAINER_VICTORY_START_MS..TRAINER_RETREAT_START_MS) return
+        // The native NPC win animation is stateful and must be queued after the first render
+        // has selected the model. The local player has no Cobblemon poser; its victory pose is
+        // driven statelessly in renderTrainer instead.
+        val trainer = findTrainerEntity(presentation) ?: return
+        if (trainer !is NPCEntity) return
+        val delegate = trainer.delegate as? NPCClientDelegate
+        if (delegate?.currentModel == null) return
+        // `win` is a primary animation in Cobblemon's standard poser, so it is not included in
+        // `allActiveAnimations`. Re-queuing based on that list would reset the animation every
+        // render frame and leave the player in its first pose.
+        if (!presentation.trainerAnimationStarted) {
+            trainer.playAnimation(NPCEntity.WIN_ANIMATION, emptyList())
+            presentation.trainerAnimationStarted = true
+        }
+    }
+
+    /**
+     * Advances the Pokemon's render animation while the cinematic is on screen. During a battle
+     * the game deliberately skips [PokemonClientDelegate.tick] for battling Pokemon on the client
+     * (PokemonEntity.tick only ticks the delegate when not battling), which is why the model renders
+     * statically after mega/dynamax/tera. A client-only test entity never ticks on its own, so both
+     * cases need this manual tick at Minecraft's simulation rate.
+     */
+    private fun tickPokemonAnimation(presentation: Presentation, elapsed: Long) {
+        if (elapsed < POKEMON_REVEAL_START_MS) return
+        val pokemon = findPokemonEntity(presentation) ?: return
+        val delegate = pokemon.delegate as? PokemonClientDelegate ?: return
+        // Advance the animation (and fire its sound_effects keyframes, e.g. the cry) at Minecraft's
+        // simulation rate. The head orientation comes from the selected battle pose; no
+        // look-control target is needed because cinematic entities use a fixed inventory angle.
+        if (elapsed - presentation.lastPokemonTickMs >= 50L) {
+            delegate.tick(pokemon)
+            presentation.lastPokemonTickMs = elapsed
+        }
+    }
+
+    private fun updatePokemonAnimation(presentation: Presentation, elapsed: Long) {
+        if (elapsed < POKEMON_CRY_START_MS) return
+        val pokemon = findPokemonEntity(presentation) ?: return
+        val delegate = (pokemon.delegate as? PokemonClientDelegate)
+        // PosableState rejects animations until the renderer has selected a model. The
+        // entity is rendered before this method, so this check makes the trigger reliable.
+        if (delegate?.currentModel == null) return
+        if (!presentation.pokemonAnimationStarted) {
+            // Resolve `cry` through the active pose so namedAnimations.cry is selected. This is
+            // where Cobblemon's battle-standing poser maps the cry to battle_cry; calling the
+            // delegate's generic cry provider bypasses that pose-specific mapping.
+            val animation = runCatching {
+                delegate.currentModel?.getAnimation(delegate, "cry", delegate.runtime)
+            }.getOrNull() ?: return
+            when (animation) {
+                is PrimaryAnimation -> delegate.addPrimaryAnimation(animation)
+                is ActiveAnimation -> delegate.addActiveAnimation(animation) {}
+            }
+            presentation.pokemonAnimationStarted = true
+        }
+        // The cry sound is played by the animation itself via its sound_effects keyframe, so it
+        // stays in sync with the roar instead of being fired a second time out of sync.
+    }
+
+    /**
+     * Renders the trainer. Real Cobblemon NPCs go through Cobblemon's own renderer and receive
+     * the native `win` animation. The local player is drawn through the vanilla player renderer
+     * instead of an NPC proxy, so the cinematic keeps the player's real skin texture and every
+     * registered cosmetic layer (Accessories, capes, armour, ...) for free. Players are posed in
+     * a fixed victory stance, NPCs keep the Cobblemon `win` animation.
+     */
+    private fun renderTrainer(
+        graphics: GuiGraphics,
+        width: Int,
+        height: Int,
+        elapsed: Long,
+        presentation: Presentation,
+    ) {
+        val trainer = findTrainerEntity(presentation) ?: return
+        val rise = ProceduralDraw.easeOutCubic((elapsed.toFloat() / TRAINER_RISE_MS).coerceIn(0.0f, 1.0f))
+        val retreat = ProceduralDraw.easeInOutCubic(
+            ((elapsed - TRAINER_RETREAT_START_MS).toFloat() / TRAINER_RETREAT_MS).coerceIn(0.0f, 1.0f),
+        )
+        val visibility = (rise * (1.0f - retreat)).coerceIn(0.0f, 1.0f)
+        if (visibility <= 0.001f) return
+
+        val offsetY = ((1.0f - rise + retreat) * height * 0.78f).roundToInt()
+        val fittedScale = min(
+            width * 0.62f / trainer.bbWidth.coerceAtLeast(0.35f),
+            height * 0.55f / trainer.bbHeight.coerceAtLeast(0.6f),
+        ).roundToInt().coerceAtLeast(1)
+        val modelScale = (min(width, height) * 0.34f).roundToInt().coerceAtMost(fittedScale)
+        val renderScale = (modelScale * visibility).roundToInt().coerceAtLeast(1)
+
+        graphics.pose().pushPose()
+        graphics.pose().translate(0.0f, offsetY.toFloat(), 240.0f)
+        RenderSystem.disableDepthTest()
+        if (trainer is AbstractClientPlayer) {
+            renderVictoryPosePlayer(graphics, width, height, renderScale, trainer)
+        } else {
+            renderTrainerEntity(graphics, width, height, renderScale, trainer)
+        }
+        RenderSystem.enableDepthTest()
+        graphics.pose().popPose()
+    }
+
+    /**
+     * Draws the local player through the vanilla player renderer in a fixed victory pose. The
+     * renderer's model is temporarily swapped for a [VictoryPosePlayerModel]; skin, held item and
+     * every cosmetic layer (Accessories, capes, ...) keep working unchanged because they all read
+     * the swapped model from the renderer.
+     */
+    private fun renderVictoryPosePlayer(
+        graphics: GuiGraphics,
+        width: Int,
+        height: Int,
+        scale: Int,
+        player: AbstractClientPlayer,
+    ) {
+        val renderer = Minecraft.getInstance().entityRenderDispatcher.getRenderer(player)
+        if (renderer !is LivingEntityRenderer<*, *>) {
+            renderTrainerEntity(graphics, width, height, scale, player)
+            return
+        }
+        val victoryModel = victoryModel(player.skin.model == PlayerSkin.Model.SLIM)
+        val originalModel = runCatching {
+            val current = modelField.get(renderer)
+            modelField.set(renderer, victoryModel)
+            current
+        }.getOrNull()
+        try {
+            renderTrainerEntity(graphics, width, height, scale, player)
+        } finally {
+            if (originalModel != null) runCatching { modelField.set(renderer, originalModel) }
+        }
+    }
+
+    private fun renderTrainerEntity(
+        graphics: GuiGraphics,
+        width: Int,
+        height: Int,
+        scale: Int,
+        entity: LivingEntity,
+    ) {
+        InventoryScreen.renderEntityInInventoryFollowsAngle(
+            graphics,
+            width / 4,
+            0,
+            width * 3 / 4,
+            height,
+            scale,
+            -0.04f,
+            0.28f,
+            -0.04f,
+            entity,
+        )
     }
 
     private fun drawBackdrop(
@@ -367,6 +567,8 @@ object MegaShowdownCinematicManager {
         type: GimmickType,
         entity: PokemonEntity,
     ) {
+        // The Pokemon stays hidden until its own reveal phase begins after the trainer.
+        if (reveal <= 0.0f) return
         val available = min(width, height).toFloat()
         val entityHeight = entity.bbHeight.coerceAtLeast(1.0f)
         val typeScale = if (type == GimmickType.DYNAMAX) 0.34f else 0.4f
@@ -374,6 +576,11 @@ object MegaShowdownCinematicManager {
         val scale = (available * typeScale / max(1.0f, entityHeight * 0.62f) * reveal * exit * pulse)
             .roundToInt()
             .coerceAtLeast(1)
+        // Keep the entity animation in the renderer's normal coordinate system. The direct
+        // renderEntityInInventory overload accepts a complete quaternion, which used to add a
+        // second 45-degree pitch on top of the inventory renderer's standard Z rotation. That
+        // made animated Pokemon lean as the pose changed. The helper below owns both the camera
+        // and entity rotations and restores the entity state after rendering.
         InventoryScreen.renderEntityInInventoryFollowsAngle(
             graphics,
             width / 4,
@@ -382,8 +589,8 @@ object MegaShowdownCinematicManager {
             min(height, centerY + height / 2),
             scale,
             -0.08f,
-            (elapsed / 1_900.0).toFloat(),
-            0.04f,
+            0.0f,
+            0.0f,
             entity,
         )
     }
@@ -431,7 +638,8 @@ object MegaShowdownCinematicManager {
     }
 
     private fun drawRevealFlash(graphics: GuiGraphics, width: Int, height: Int, elapsed: Long) {
-        val revealFlash = (1.0f - abs(elapsed - 520L) / 180.0f).coerceIn(0.0f, 1.0f)
+        val revealPeak = POKEMON_REVEAL_START_MS + POKEMON_REVEAL_MS / 2
+        val revealFlash = (1.0f - abs(elapsed - revealPeak) / 180.0f).coerceIn(0.0f, 1.0f)
         val exitFlash = ((elapsed - (DURATION_MS - 280L)) / 280.0f).coerceIn(0.0f, 1.0f)
         val flash = max(revealFlash * revealFlash * 0.52f, exitFlash * 0.72f)
         if (flash > 0.0f) {
@@ -455,6 +663,16 @@ object MegaShowdownCinematicManager {
 
     private fun findPokemonEntity(presentation: Presentation): PokemonEntity? {
         presentation.debugEntity?.let { return it }
+        // A real battle Pokemon carries the battle LookControl, which pitches its head down at
+        // the (missing) target. Render through a temporary client-only proxy that mirrors the
+        // species/form/aspects instead, so the head stays level and the animation is independent.
+        presentation.renderProxy?.let { return it }
+        val real = findRealPokemonEntity(presentation) ?: return null
+        presentation.renderProxy = createRenderProxy(real) ?: real
+        return presentation.renderProxy
+    }
+
+    private fun findRealPokemonEntity(presentation: Presentation): PokemonEntity? {
         val entities = Minecraft.getInstance().level
             ?.entitiesForRendering()
             ?.filterIsInstance<PokemonEntity>()
@@ -469,14 +687,72 @@ object MegaShowdownCinematicManager {
         }
     }
 
-    private fun createDebugPokemon(): PokemonEntity? {
+    private fun createRenderProxy(realEntity: PokemonEntity): PokemonEntity? {
         val level = Minecraft.getInstance().level ?: return null
-        val species = PokemonSpecies.getByName("pikachu") ?: return null
+        return runCatching {
+            val tempPokemon = Pokemon().copyFrom(realEntity.pokemon)
+            PokemonEntity(level, tempPokemon, CobblemonEntities.POKEMON).also { entity ->
+                entity.entityData.set(PokemonEntity.ASPECTS, realEntity.aspects.toSet())
+                (entity.delegate as? PokemonClientDelegate)?.initialize(entity)
+                positionCinematicPokemon(entity)
+                // Poser conditions use `in_battle` to select battle-standing and its head base
+                // correction. This id never resolves to a server battle and is local to the proxy.
+                entity.battleId = UUID.randomUUID()
+            }
+        }.getOrNull()
+    }
+
+    private fun findTrainerEntity(presentation: Presentation): LivingEntity? {
+        presentation.trainerId?.let { trainerId ->
+            Minecraft.getInstance().level
+                ?.entitiesForRendering()
+                ?.firstOrNull { it.uuid == trainerId && it is LivingEntity }
+                ?.let { return it as LivingEntity }
+        }
+        return Minecraft.getInstance().player
+    }
+
+    private fun findTrainerId(pokemonId: UUID?): UUID? {
+        if (pokemonId == null) return Minecraft.getInstance().player?.uuid
+        return CobblemonClient.battle
+            ?.sides
+            ?.flatMap { it.actors }
+            ?.firstOrNull { actor ->
+                actor.activePokemon.any { it.battlePokemon?.uuid == pokemonId } ||
+                    actor.pokemon.any { it.uuid == pokemonId }
+            }
+            ?.uuid
+            ?: Minecraft.getInstance().player?.uuid
+    }
+
+    private fun createDebugPokemon(pokemonId: String?): PokemonEntity? {
+        val level = Minecraft.getInstance().level ?: return null
+        val species = pokemonId
+            ?.let { ResourceLocation.tryParse(it) }
+            ?.let { runCatching { PokemonSpecies.getByIdentifier(it) }.getOrNull() }
+            ?: PokemonSpecies.getByName("pikachu")
+        if (species == null) return null
         val pokemon = Pokemon().apply {
             this.species = species
             this.level = 50
         }
-        return PokemonEntity(level, pokemon, CobblemonEntities.POKEMON)
+        return PokemonEntity(level, pokemon, CobblemonEntities.POKEMON).also { entity ->
+            (entity.delegate as? PokemonClientDelegate)?.initialize(entity)
+            positionCinematicPokemon(entity)
+            // Keep debug entities on the same battle pose path as real gimmick presentations.
+            entity.battleId = UUID.randomUUID()
+        }
+    }
+
+    /**
+     * Bedrock sound keyframes use the entity's world position for positional playback. Temporary
+     * cinematic entities are never added to the level and otherwise remain at (0, 0, 0), which
+     * makes the cry inaudible when the player is elsewhere in the world.
+     */
+    private fun positionCinematicPokemon(entity: PokemonEntity) {
+        Minecraft.getInstance().player?.let { player ->
+            entity.setPos(player.x, player.y, player.z)
+        }
     }
 
     private fun Any?.toComponent(): Component = when (this) {
@@ -514,6 +790,11 @@ object MegaShowdownCinematicManager {
         val pokemonName: Component,
         val pokemonId: UUID?,
         val debugEntity: PokemonEntity? = null,
+        val trainerId: UUID? = null,
+        var trainerAnimationStarted: Boolean = false,
+        var pokemonAnimationStarted: Boolean = false,
+        var lastPokemonTickMs: Long = -50L,
+        var renderProxy: PokemonEntity? = null,
     )
 
     private data class Palette(val primary: Int, val secondary: Int, val accent: Int)
@@ -610,4 +891,40 @@ object MegaShowdownCinematicManager {
     }
 
     private const val GIMMICK_SOUND_GROUP = "mega_showdown_gimmick"
+}
+
+/**
+ * A vanilla [PlayerModel] that locks the arms into a fixed victory pose after the normal
+ * [PlayerModel.setupAnim] pass. Used for the cinematic player so the pose does not depend on the
+ * Cobblemon NPC poser (which cannot drive the vanilla model, nor carry the player's cosmetics).
+ */
+private class VictoryPosePlayerModel(root: ModelPart, slim: Boolean) :
+    PlayerModel<AbstractClientPlayer>(root, slim) {
+
+    override fun setupAnim(
+        entity: AbstractClientPlayer,
+        limbSwing: Float,
+        limbSwingAmount: Float,
+        ageInTicks: Float,
+        netHeadYaw: Float,
+        headPitch: Float,
+    ) {
+        super.setupAnim(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch)
+        // Left arm raised ~80° above horizontal (nearly overhead); right arm extended 30°
+        // backward and abducted 30° outward.
+        leftArm.xRot = LEFT_ARM_RAISED_X
+        leftArm.yRot = 0.0f
+        leftArm.zRot = 0.0f
+        rightArm.xRot = RIGHT_ARM_BACK_X
+        rightArm.yRot = 0.0f
+        rightArm.zRot = RIGHT_ARM_OUT_Z
+        leftSleeve.copyFrom(leftArm)
+        rightSleeve.copyFrom(rightArm)
+    }
+
+    companion object {
+        private val LEFT_ARM_RAISED_X = Math.toRadians(-170.0).toFloat()
+        private val RIGHT_ARM_BACK_X = Math.toRadians(30.0).toFloat()
+        private val RIGHT_ARM_OUT_Z = Math.toRadians(30.0).toFloat()
+    }
 }

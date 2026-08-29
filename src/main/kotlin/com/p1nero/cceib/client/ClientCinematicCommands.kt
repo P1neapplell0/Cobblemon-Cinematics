@@ -3,6 +3,9 @@ package com.p1nero.cceib.client
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.LiteralArgumentBuilder.literal
+import com.mojang.brigadier.builder.RequiredArgumentBuilder.argument
+import com.cobblemon.mod.common.command.argument.SpeciesArgumentType
+import com.cobblemon.mod.common.pokemon.Species
 import net.minecraft.client.Minecraft
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
@@ -38,9 +41,14 @@ object ClientCinematicCommands {
         name: String,
         kind: CinematicTestController.Kind,
     ): LiteralArgumentBuilder<CommandSourceStack> =
-        literal<CommandSourceStack>(name).executes {
-            report(name, CinematicTestController.request(kind))
-        }
+        literal<CommandSourceStack>(name)
+            .executes { report(name, CinematicTestController.request(kind)) }
+            .then(
+                argument<CommandSourceStack, Species>("pokemon_id", SpeciesArgumentType.Companion.species()).executes {
+                    val species = SpeciesArgumentType.Companion.getPokemon(it, "pokemon_id")
+                    report(name, CinematicTestController.request(kind, species.resourceIdentifier.toString()))
+                },
+            )
 
     private fun report(name: String, success: Boolean): Int {
         Minecraft.getInstance().player?.displayClientMessage(

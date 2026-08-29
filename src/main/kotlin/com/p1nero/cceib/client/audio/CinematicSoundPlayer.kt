@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.sounds.SoundEvent
 
 /** Plays existing Minecraft/Cobblemon sound events without bundling duplicate audio assets. */
 object CinematicSoundPlayer {
@@ -25,15 +26,15 @@ object CinematicSoundPlayer {
 
     fun play(soundId: String, volume: Float = 1.0f, pitch: Float = 1.0f) {
         val location = ResourceLocation.tryParse(soundId) ?: return
-        BuiltInRegistries.SOUND_EVENT.getOptional(location).ifPresent { sound ->
-            dispatching = true
-            try {
-                Minecraft.getInstance().soundManager.play(
-                    SimpleSoundInstance.forUI(sound, pitch, volume),
-                )
-            } finally {
-                dispatching = false
-            }
+        val sound = BuiltInRegistries.SOUND_EVENT.getOptional(location)
+            .orElseGet { SoundEvent.createVariableRangeEvent(location) }
+        dispatching = true
+        try {
+            Minecraft.getInstance().soundManager.play(
+                SimpleSoundInstance.forUI(sound, pitch, volume),
+            )
+        } finally {
+            dispatching = false
         }
     }
 

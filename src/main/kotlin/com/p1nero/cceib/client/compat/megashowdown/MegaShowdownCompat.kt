@@ -23,7 +23,8 @@ object MegaShowdownCompat {
 
     fun isPlaying(): Boolean = MegaShowdownCinematicManager.isPlaying()
 
-    fun debugPlay(kind: String): Boolean = MegaShowdownCinematicManager.debugPlay(kind)
+    fun debugPlay(kind: String, pokemonId: String? = null): Boolean =
+        MegaShowdownCinematicManager.debugPlay(kind, pokemonId)
 
     fun stopTest() {
         MegaShowdownCinematicManager.stopTest()

@@ -252,9 +252,8 @@ object BadgeCinematicManager {
         startedAt = System.nanoTime()
         if (ClientConfig.badgeSound.get()) {
             Minecraft.getInstance().soundManager.play(
-                // The two-argument forUI overload defaults volume to 0.25F in Minecraft 1.21.1;
-                // pass the volume explicitly so the badge sound is not unintentionally attenuated.
-                SimpleSoundInstance.forUI(ModSounds.BADGE_GET.get(), 1.0f, 1.0f),
+                // Keep the explicit volume so the sound is not affected by the attenuated overload.
+                SimpleSoundInstance.forUI(ModSounds.BADGE_GET.get(), 1.0f, 0.5f),
             )
         }
     }

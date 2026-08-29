@@ -2,6 +2,21 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.3.0] - 2026-08-30
+
+### Added
+
+- Added staged Mega Showdown presentations with trainer victory poses and delayed Pokemon reveals.
+- Added optional species IDs to the four gimmick test commands, allowing a specific client-side Pokemon to be previewed instead of the default Pikachu.
+
+### Changed
+
+- Updated gimmick presentations to advance Cobblemon poser animations during the cinematic and use the active battle presentation flow for Pokemon reveals and cries.
+
+### Verification
+
+- `./gradlew build` and `git diff --check` pass successfully.
+
 ## [1.2.0] - 2026-08-11
 
 ### Added
@@ -13,6 +28,7 @@ All notable changes to Cobblemon Cinematics are documented here.
 
 ### Changed
 
+- Reworked Mega Showdown presentation actors to use a client-only Cobblemon standard NPC proxy with the native `win` animation, eliminating the vanilla player arm-swing fallback. Pokemon cry playback now uses each rendered species' `PokemonClientDelegate` CryProvider and waits for model initialization before triggering the animation or sound.
 - Reorganized the client configuration into `general`, `battleIntro`, `battleCamera`, `megaShowdown`, and `badges` TOML groups. Existing flat 1.1.x configuration keys are replaced with grouped defaults and must be customized again after upgrading.
 - Removed the separate `wildBattleIntros` toggle; `battleIntro.wildPokemonWhitelist` and `battleIntro.wildPokemonBlacklist` are now the sole controls for wild intros.
 - Reworked battle-camera framing around all active Pokemon using their bounding boxes, current FOV, display aspect ratio, and the actual framing pivot.
@@ -23,6 +39,7 @@ All notable changes to Cobblemon Cinematics are documented here.
 
 ### Fixed
 
+- Kept the NeoForge mod metadata version SemVer-compatible while applying the `neoforge1.21.1` platform marker only to the JAR filename, fixing `runClient` startup rejection.
 - Kept the dynamic-camera key hint visible during battles even when the camera is disabled, allowing players to discover how to re-enable it.
 - Prevented the battle-intro sound-delay filter from swallowing the cinematic's own audio and replaced the inaudible Z-Move cue with a multi-stage activation sequence.
 - Fixed wild battles entering the Trainer-intro path and producing an empty presentation without a Pokemon model.
@@ -113,6 +130,13 @@ All notable changes to Cobblemon Cinematics are documented here.
 
 ## 简体中文摘要
 
+### 1.3.0
+
+- 新增分阶段的 Mega Showdown 特效演出，包含训练师胜利姿态与延迟宝可梦显现。
+- 四种特殊机制测试命令新增可选物种 ID，可预览指定的仅客户端宝可梦（默认仍为皮卡丘）。
+- 更新特殊机制演出流程，在特效期间推进 Cobblemon poser 动画，并按战斗演出流程处理宝可梦显现与吼叫。
+- `./gradlew build` 与 `git diff --check` 通过。
+
 ### 1.2.0
 
 - 新增野生宝可梦战斗开场，渲染实际对方模型与名称；由物种黑白名单直接控制，默认白名单为神兽与幻兽。
@@ -125,6 +149,7 @@ All notable changes to Cobblemon Cinematics are documented here.
 - 保留 Minecraft 原生碰撞射线作为最终保护；撞墙立即收近，离墙平滑拉远。
 - 开场模型按实体宽高与分配区域动态缩放，避免大型宝可梦在单打或双打画面中显示不完整。
 - 将徽章获得音频从约 -29.7 LUFS 归一化至 -14.0 LUFS，并保留峰值余量。
+- 模组元数据继续使用 NeoForge 可解析的语义版本，仅在 JAR 文件名中加入 `neoforge1.21.1` 平台标识，修复 `runClient` 因非法版本号而拒绝启动的问题。
 - 在运镜关闭时继续显示动态按键提示，方便玩家发现如何重新启用运镜。
 - 修复开场音效被延迟逻辑误拦截、Z 招式提示音不明显，以及野生战斗错误进入训练师开场的问题。
 - 宝可梦倒下后，只要同 UUID 模型仍在渲染列表中就继续跟踪；一方消失时不会匹配附近或同名实体，避免战斗结束阶段镜头乱飞。

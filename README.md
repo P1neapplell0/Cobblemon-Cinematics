@@ -96,7 +96,7 @@ These client commands can be run from chat anywhere in a loaded world. They open
 /cobblemoncinematics test all
 ```
 
-The intro uses the local player as a test Trainer, the badge test uses a temporary Nether Star, and gimmick tests render a client-only Pikachu when no battle Pokémon exists. Explicit test commands bypass feature toggles and do not require Mega Showdown because they only exercise this mod's presentation layer; automatic triggering from real battles remains available only when Mega Showdown is installed and respects every corresponding configuration option. `all` plays every test cinematic sequentially.
+The four gimmick commands also accept an optional species ID, for example `/cobblemoncinematics test mega cobblemon:charizard`. The intro uses the local player as a test Trainer, the badge test uses a temporary Nether Star, and gimmick tests render the requested client-only Pokemon (Pikachu by default). Explicit test commands bypass feature toggles and do not require Mega Showdown because they only exercise this mod's presentation layer; automatic triggering from real battles remains available only when Mega Showdown is installed and respects every corresponding configuration option. `all` plays every test cinematic sequentially.
 
 ## Building
 

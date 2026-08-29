@@ -16,14 +16,22 @@ object CinematicTestController {
         TERASTALIZATION,
     }
 
-    private val queue = ArrayDeque<Kind>()
+    private val queue = ArrayDeque<Request>()
     private var active: Kind? = null
     private var openRequested = false
 
     fun request(vararg kinds: Kind): Boolean {
+        return request(kinds.map { Request(it, null) })
+    }
+
+    fun request(kind: Kind, pokemonId: String?): Boolean {
+        return request(listOf(Request(kind, pokemonId)))
+    }
+
+    private fun request(requests: List<Request>): Boolean {
         val minecraft = Minecraft.getInstance()
         if (minecraft.player == null || minecraft.level == null) return false
-        queue.addAll(kinds)
+        queue.addAll(requests)
         openRequested = true
         return true
     }
@@ -51,7 +59,7 @@ object CinematicTestController {
         while (queue.isNotEmpty()) {
             val next = queue.removeFirst()
             if (start(next)) {
-                active = next
+                active = next.kind
                 return
             }
         }
@@ -68,14 +76,16 @@ object CinematicTestController {
         MegaShowdownCompat.stopTest()
     }
 
-    private fun start(kind: Kind): Boolean = when (kind) {
+    private fun start(request: Request): Boolean = when (request.kind) {
         Kind.BATTLE_INTRO -> BattleIntroController.debugStandalone()
         Kind.BADGE -> BadgeCinematicManager.debugPlay()
-        Kind.MEGA -> MegaShowdownCompat.debugPlay("mega")
-        Kind.DYNAMAX -> MegaShowdownCompat.debugPlay("dynamax")
-        Kind.Z_MOVE -> MegaShowdownCompat.debugPlay("zmove")
-        Kind.TERASTALIZATION -> MegaShowdownCompat.debugPlay("terastalization")
+        Kind.MEGA -> MegaShowdownCompat.debugPlay("mega", request.pokemonId)
+        Kind.DYNAMAX -> MegaShowdownCompat.debugPlay("dynamax", request.pokemonId)
+        Kind.Z_MOVE -> MegaShowdownCompat.debugPlay("zmove", request.pokemonId)
+        Kind.TERASTALIZATION -> MegaShowdownCompat.debugPlay("terastalization", request.pokemonId)
     }
+
+    private data class Request(val kind: Kind, val pokemonId: String?)
 
     private fun isPlaying(kind: Kind): Boolean = when (kind) {
         Kind.BATTLE_INTRO -> BattleIntroController.isPlaying()
