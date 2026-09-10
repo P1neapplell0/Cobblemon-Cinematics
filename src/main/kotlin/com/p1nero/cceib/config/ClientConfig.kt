@@ -90,6 +90,34 @@ object ClientConfig {
 
     init {
         builder.pop()
+        builder.push("battleOcclusion")
+    }
+
+    val fadeOccludingBlocks: ModConfigSpec.BooleanValue = builder
+        .comment(
+            "Fade the blocks standing between the battle camera and the framed Pokemon instead of pulling the camera in.",
+            "Disable to fall back to the shot selection that re-aims the camera away from walls.",
+        )
+        .define("enabled", true)
+
+    val occlusionConeAngle: ModConfigSpec.DoubleValue = builder
+        .comment("Half angle in degrees of the beam that clears the view. Wider covers more of the frame.")
+        .defineInRange("coneAngle", 30.0, 5.0, 45.0)
+
+    val occlusionEdgeSoftness: ModConfigSpec.DoubleValue = builder
+        .comment("How much of the beam's radius is spent on the soft rim, as a fraction. 0 is a hard cone.")
+        .defineInRange("edgeSoftness", 0.45, 0.0, 0.9)
+
+    val occlusionFadeWidth: ModConfigSpec.DoubleValue = builder
+        .comment("How many blocks past the Pokemon the beam takes to fade out completely.")
+        .defineInRange("fadeWidth", 1.5, 0.1, 16.0)
+
+    val occlusionFloorMargin: ModConfigSpec.DoubleValue = builder
+        .comment("Blocks whose top is within this distance above the Pokemon's feet are never faded, so the ground (and any slab it stands on) stays intact.")
+        .defineInRange("floorMargin", 0.5, 0.0, 8.0)
+
+    init {
+        builder.pop()
         builder.push("megaShowdown")
     }
 

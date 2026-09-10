@@ -12,7 +12,7 @@ Cobblemon Cinematics 是一个面向 Minecraft 1.21.1、NeoForge 和 Cobblemon 1
 - **战斗镜头**：根据全部出战宝可梦的碰撞箱体型、当前 FOV 和屏幕宽高比自动构图，并在选择招式后依次聚焦攻击方和目标。
 - **动态运镜提示**：自动运镜工作时显示当前实际绑定的镜头开关键。
 - **过场音效**：复用 Cobblemon 与 Minecraft 的现有音效事件，为战斗开场、超级进化、极巨化、Z力量和太晶化提供音效，不额外打包宝可梦原游戏音频。
-- **相机碰撞**：按净空与主体可见性评估多个偏航和俯仰机位，再以 Minecraft 原生相机碰撞作为最终防穿墙保护。
+- **相机碰撞**：不再因撞墙收近镜头，挡视线的方块按手电筒光锥的形状淡出——每只宝可梦、每位训练师各一束，从相机张开、到目标处截止、边缘柔和衰减，所有目标都保持清晰且没有生硬边界；宝可梦脚下的地面永不处理。相关开关与参数在 `battleOcclusion` 分组，关闭后回退到原先"把镜头换到不被遮挡角度"的机位选择。
 - **徽章获得演出**：获得匹配物品时播放程序化金色背景、粒子、光环、真实物品模型和获得音效。
 - **窗口兼容**：没有打开 Screen 时使用暂停界面播放；已有 Screen 时只在最上层绘制，不阻止原界面交互。
 - **可选模组兼容**：不依赖任何特定徽章模组。默认配置可识别 Badge Box 和 Cobblemon Pokemon Badges，也能匹配整合包自定义物品。
@@ -47,6 +47,11 @@ Badge Box、Cobblemon Pokemon Badges 和 Mega Showdown 均为可选。徽章物�
 | `battleCamera.enabled` | `true` | 启用动态战斗镜头 |
 | `battleCamera.attackFocus` | `true` | 选择行动后聚焦攻击方与目标 |
 | `battleCamera.hint` | `true` | 自动运镜时显示实际绑定的镜头开关键 |
+| `battleOcclusion.enabled` | `true` | 淡出挡视线的方块，而不是把镜头拉近 |
+| `battleOcclusion.coneAngle` | `30.0` | 清除视线的光锥半角（度） |
+| `battleOcclusion.edgeSoftness` | `0.45` | 光锥半径中用于柔和边缘的比例 |
+| `battleOcclusion.fadeWidth` | `1.5` | 宝可梦之后多少格内光锥完全淡出 |
+| `battleOcclusion.floorMargin` | `0.5` | 宝可梦脚下以上多少格内的方块永不淡出 |
 | `megaShowdown.megaEvolution` | `true` | 启用可选的超级进化演出 |
 | `megaShowdown.dynamax` | `true` | 启用可选的极巨化演出 |
 | `megaShowdown.zMove` | `true` | 启用可选的 Z力量演出 |

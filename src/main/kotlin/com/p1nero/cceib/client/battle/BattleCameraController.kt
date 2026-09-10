@@ -13,9 +13,10 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.network.chat.Component
 import net.minecraft.util.Mth
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import net.neoforged.bus.api.EventPriority
 import net.neoforged.bus.api.SubscribeEvent
@@ -32,6 +33,7 @@ object BattleCameraController {
     private const val SMOOTHING_RATE = 8.0
     private const val COLLISION_RELEASE_RATE = 5.0
     private const val ORBIT_SPEED_DEGREES = 9.0f
+    private const val CLIENT_TICK_SECONDS = 1.0 / 20.0
     private const val ENVIRONMENT_UPDATE_INTERVAL = 3
 
     private var enabledByKey = true
@@ -45,10 +47,10 @@ object BattleCameraController {
     private var lastFrameNanos = 0L
     private var previousCameraType: CameraType? = null
     private var trackingAvailable = false
-    private var environmentChoice: EnvironmentChoice? = null
-    private var environmentUpdateTicks = 0
     private var collisionDistance: Float? = null
     private var frameDeltaSeconds = 1.0 / 60.0
+    private var environmentChoice: EnvironmentChoice? = null
+    private var environmentUpdateTicks = 0
 
     fun toggle() {
         enabledByKey = !enabledByKey
@@ -87,15 +89,22 @@ object BattleCameraController {
 
         ensureCinematicPerspective()
         updateBattleEntities()
+        updateOcclusion()
         phaseTicks++
         when (phase) {
             CameraPhase.ATTACKER -> if (phaseTicks >= 32) changePhase(CameraPhase.TARGET)
             CameraPhase.TARGET -> if (phaseTicks >= 32) changePhase(CameraPhase.ORBIT)
             CameraPhase.ORBIT -> Unit
         }
-        if (trackingAvailable && (--environmentUpdateTicks <= 0 || environmentChoice?.phase != phase)) {
-            environmentChoice = selectEnvironmentChoice()
-            environmentUpdateTicks = ENVIRONMENT_UPDATE_INTERVAL
+        // With the world cut open the framing never has to move out of the way. Without it the shot
+        // is re-aimed at an angle that is not blocked, rather than being pulled back into the camera.
+        if (!ClientConfig.fadeOccludingBlocks.get()) {
+            if (trackingAvailable && (--environmentUpdateTicks <= 0 || environmentChoice?.phase != phase)) {
+                environmentChoice = selectEnvironmentChoice()
+                environmentUpdateTicks = ENVIRONMENT_UPDATE_INTERVAL
+            }
+        } else {
+            environmentChoice = null
         }
     }
 
@@ -197,8 +206,10 @@ object BattleCameraController {
         return current
     }
 
+    /** Applies the clear-angle shot when the world is not being cut open. */
     private fun desiredTransform(partialTick: Float): CameraTransform? {
         val base = baseTransform(partialTick) ?: return null
+        if (ClientConfig.fadeOccludingBlocks.get()) return base
         val environment = environmentChoice?.takeIf { it.phase == phase } ?: return base
         return base.copy(
             yaw = base.yaw + environment.yawOffset,
@@ -268,6 +279,12 @@ object BattleCameraController {
         return sum.scale(1.0 / entities.size.coerceAtLeast(1))
     }
 
+    /**
+     * Picks the shot angle that keeps the subject in view with as much clearance behind the camera
+     * as possible, the way this mod framed shots before the world could be cut open. This is the
+     * fallback used when block fading is disabled, so the camera steps aside instead of being
+     * pulled back into the wall.
+     */
     private fun selectEnvironmentChoice(): EnvironmentChoice? {
         val base = baseTransform(1.0f) ?: return null
         val subjects = when (phase) {
@@ -284,8 +301,7 @@ object BattleCameraController {
         val candidates = yawOffsets.flatMap { yawOffset ->
             pitchOffsets.map { pitchOffset ->
                 val pitch = (base.pitch + pitchOffset).coerceIn(-12.0f, 42.0f)
-                val clearance = cameraClearance(base.pivot, base.yaw + yawOffset, pitch, base.distance)
-                EnvironmentCandidate(yawOffset, pitchOffset, clearance)
+                EnvironmentCandidate(yawOffset, pitchOffset, cameraClearance(base.pivot, base.yaw + yawOffset, pitch, base.distance))
             }
         }
         return candidates
@@ -297,13 +313,13 @@ object BattleCameraController {
             .take(5)
             .maxByOrNull { candidate ->
                 val distance = min(base.distance, (candidate.clearance - 0.18f).coerceAtLeast(0.6f))
-                val cameraPosition = cameraPosition(
+                val position = cameraPosition(
                     base.pivot,
                     base.yaw + candidate.yawOffset,
                     (base.pitch + candidate.pitchOffset).coerceIn(-12.0f, 42.0f),
                     distance,
                 )
-                val visibleSubjects = subjects.count { hasLineOfSight(cameraPosition, it) }
+                val visibleSubjects = subjects.count { hasLineOfSight(position, it) }
                 val stabilityBonus = if (
                     previousChoice != null &&
                     kotlin.math.abs(previousChoice.yawOffset - candidate.yawOffset) < 1.0f &&
@@ -326,8 +342,8 @@ object BattleCameraController {
     }
 
     private fun cameraClearance(pivot: Vec3, yaw: Float, pitch: Float, desiredDistance: Float): Float {
-        val cameraPosition = cameraPosition(pivot, yaw, pitch, desiredDistance)
-        val hit = clip(pivot, cameraPosition)
+        val position = cameraPosition(pivot, yaw, pitch, desiredDistance)
+        val hit = clip(pivot, position)
         return if (hit.type == HitResult.Type.MISS) desiredDistance else pivot.distanceTo(hit.location).toFloat()
     }
 
@@ -343,9 +359,51 @@ object BattleCameraController {
         if (level == null || source == null) {
             return BlockHitResult.miss(to, Direction.UP, BlockPos.containing(to))
         }
-        return level.clip(
-            ClipContext(from, to, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, source),
-        )
+        return level.clip(ClipContext(from, to, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, source))
+    }
+
+    /** Fades the blocks between the rendered camera and everything the shot has to show. */
+    private fun updateOcclusion() {
+        val transform = current
+        if (transform == null) {
+            CameraOcclusionFader.tick(null, emptyList(), CLIENT_TICK_SECONDS)
+            return
+        }
+        val camera = cameraPosition(transform.pivot, transform.yaw, transform.pitch, transform.distance)
+        CameraOcclusionFader.tick(camera, occlusionSubjects(), CLIENT_TICK_SECONDS)
+    }
+
+    /**
+     * Everything the shot has to keep visible: the framed Pokemon plus every trainer in the battle.
+     * A Pokemon standing inside a house needs its own beam even when the camera is out in the open
+     * behind another one.
+     */
+    private fun occlusionSubjects(): List<CameraOcclusionFader.Subject> {
+        val level = Minecraft.getInstance().level ?: return emptyList()
+        val entities = ArrayList<Entity>()
+        for (entity in trackedEntities()) {
+            entities += entity
+        }
+        val battle = CobblemonClient.battle
+        if (battle != null) {
+            val rendered = level.entitiesForRendering().toList()
+            for (actor in battle.sides.flatMap { side -> side.actors }) {
+                if (entities.any { it.uuid == actor.uuid }) continue
+                val entity = rendered.firstOrNull { it.uuid == actor.uuid } ?: continue
+                entities += entity
+            }
+        }
+        return entities.map { entity ->
+            CameraOcclusionFader.Subject(
+                entity.position().add(0.0, max(0.8, entity.bbHeight * 0.6), 0.0),
+                entity.y,
+            )
+        }
+    }
+
+    private fun trackedEntities(): List<PokemonEntity> = when (phase) {
+        CameraPhase.ORBIT -> activeEntities
+        CameraPhase.ATTACKER, CameraPhase.TARGET -> listOfNotNull(attackerEntity, targetEntity)
     }
 
     private fun cameraPosition(pivot: Vec3, yaw: Float, pitch: Float, distance: Float): Vec3 =
@@ -447,9 +505,10 @@ object BattleCameraController {
         activeEntities = emptyList()
         trackingAvailable = false
         current = null
+        collisionDistance = null
         environmentChoice = null
         environmentUpdateTicks = 0
-        collisionDistance = null
+        CameraOcclusionFader.clear()
         orbitYaw = 0.0f
         lastFrameNanos = 0L
     }
@@ -464,6 +523,10 @@ object BattleCameraController {
     @JvmStatic
     fun currentTransform(): CameraTransform? = current.takeIf { isBattleCameraActive() && trackingAvailable }
 
+    /**
+     * Wall collision used when block fading is turned off: the boom snaps in when a wall appears and
+     * eases back out as it clears, so the camera never clips through and never lurches.
+     */
     @JvmStatic
     fun resolveCollisionDistance(safeDistance: Float): Float {
         val previous = collisionDistance

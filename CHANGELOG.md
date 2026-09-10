@@ -2,6 +2,21 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.3.1] - 2026-09-09
+
+### Changed
+
+- The battle camera no longer reacts to walls at all. It keeps its framing distance and angle, so the camera can end up inside or behind a wall instead of being pushed away from it.
+- Removed the wall-aware shot selection that scored alternate yaw and pitch angles for clearance and line of sight. That is what made the camera swing away from a wall instead of passing through it.
+- The blocks between the battle camera and the fight now fade out over a beam shaped like a torch: a cone opening from the camera that stops at its target and falls off softly at its rim, so the opening has no hard edge. Its core is fully clear, everything past the target renders completely normally, and the ground it stands on is never touched. One beam is cast per subject, so a Pokemon or trainer standing inside a building still gets cleared while the camera is out in the open behind it.
+- Faded blocks still cull against each other, so a fading wall stays a single surface rather than a mess of unlit inner faces, and they are reported as air to their unfaded neighbours so those emit the faces that were culled against them - which is what makes the opening see-through.
+- Added a `battleOcclusion` config group. The beam is on by default and can be turned off, and its angle, rim softness, depth fade and floor margin are configurable. Turning it off falls back to the original shot selection, which re-aims the camera at an angle that is not blocked instead of pulling the boom into the wall.
+
+### Verification
+
+- `./gradlew build` passes successfully.
+- Wall, corner, and low-ceiling scenes still need in-game visual verification, including the chunk-rebuild cost while the camera moves behind walls.
+
 ## [1.3.0] - 2026-08-30
 
 ### Added
@@ -129,6 +144,16 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.3.1
+
+- 战斗镜头完全不再对墙壁做出反应：保持原有距离与角度，镜头可以进入或越过墙体，而不是被墙推开。
+- 遮挡方块在约半秒内平滑淡出到全透明，而不是瞬间消失：开始挡住构图的方块由原版区块构建器写入半透明渲染层，alpha 从不透明平滑降到全透明，不再遮挡时再平滑恢复；对未淡出的邻居报告为空气，让原本被剔除的相邻面重新生成；完全透明后从网格中彻底移除，避免写入深度遮挡后面的绘制。淡入淡出直接烘焙进区块网格，不依赖额外渲染批次，因此不会出现"没有绘制"的情况。
+- 移除按净空与视线评估偏航/俯仰机位的避墙逻辑——正是它让镜头绕开墙而不是穿过去。
+- 相机与对战之间挡视线的方块改为按"手电筒光锥"的形状淡出：从相机张开、到目标处截止的圆锥，边缘平滑衰减，所以开口没有生硬的边界。光锥核心完全透明，目标之后的一切完全正常渲染，目标脚下的地面永不处理。每只宝可梦、每位训练师各投一束光锥，因此即使一只在屋内、相机在屋外另一只身后，屋内那只也会被清出视野。
+- 淡出的方块彼此之间仍然互相剔除，墙面只呈现为一层表面而不是一堆未受光的内面；同时对未淡出的邻居报告为空气，让原本被剔除的面重新生成——这正是开口能透视的原因。
+- 新增 `battleOcclusion` 配置分组。光锥默认开启且可关闭，锥角、边缘柔和度、深度渐变与地面余量均可配置。关闭后回退到原先的机位选择：把镜头换到一个不被墙遮挡的角度，而不是把镜头拉近。
+- `./gradlew build` 通过；墙角、低天花板等场景以及镜头贴墙移动时的区块重建开销仍需游戏内目视验证。
 
 ### 1.3.0
 

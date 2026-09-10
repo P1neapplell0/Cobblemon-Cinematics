@@ -12,7 +12,7 @@ Cobblemon Cinematics is a client-side cinematic mod for Minecraft 1.21.1, NeoFor
 - **Battle camera**: Frames all active Pokemon using their bounding-box size, the current FOV and display aspect ratio, then focuses on the attacker and target after a move is selected.
 - **Dynamic camera hint**: Shows the currently bound camera-toggle key during automatic camera operation.
 - **Cinematic audio**: Reuses Cobblemon and Minecraft sound events for battle introductions, Mega Evolution, Dynamax, Z-Power, and Terastallization without bundling copyrighted Pokémon game audio.
-- **Camera collision**: Scores alternate yaw and pitch positions for clearance and subject visibility, then uses Minecraft's native collision detection as the final wall-clipping safeguard.
+- **Camera collision**: Does not shorten the boom against walls. The blocks in the way fade out over torch-shaped beams - one per Pokemon and trainer in the fight - that open from the camera, stop at their subject and fall off softly at the rim, so every subject stays clear without a hard edge. The ground the Pokemon stands on is never touched. Configured in the `battleOcclusion` group; disabling it falls back to the original shot selection that re-aims the camera away from walls.
 - **Badge acquisition cinematic**: Plays a procedural golden backdrop, particles, rings, the actual badge item model, and an acquisition sound when a matching item is obtained.
 - **Screen compatibility**: Pauses the game and opens a dedicated screen when no screen is active. If another screen is already open, the cinematic renders above it without blocking its interaction.
 - **Optional mod compatibility**: Does not depend on a specific badge mod. The default configuration recognizes Badge Box and Cobblemon Pokemon Badges items and can also match custom modpack items.
@@ -47,6 +47,11 @@ The client configuration is stored in `config/cobblemoncinematics-client.toml`.
 | `battleCamera.enabled` | `true` | Enables the dynamic battle camera |
 | `battleCamera.attackFocus` | `true` | Focuses on the attacker and target after an action is selected |
 | `battleCamera.hint` | `true` | Shows the actual bound camera-toggle key during automatic camera operation |
+| `battleOcclusion.enabled` | `true` | Fades the blocks in the way instead of pulling the camera in |
+| `battleOcclusion.coneAngle` | `30.0` | Half angle in degrees of the beam that clears the view |
+| `battleOcclusion.edgeSoftness` | `0.45` | Fraction of the beam's radius spent on the soft rim |
+| `battleOcclusion.fadeWidth` | `1.5` | Blocks past the Pokemon over which the beam fades out |
+| `battleOcclusion.floorMargin` | `0.5` | Blocks above the Pokemon's feet that are never faded |
 | `megaShowdown.megaEvolution` | `true` | Enables the optional Mega Evolution presentation |
 | `megaShowdown.dynamax` | `true` | Enables the optional Dynamax presentation |
 | `megaShowdown.zMove` | `true` | Enables the optional Z-Power presentation |

@@ -1,16 +1,17 @@
 package com.p1nero.cceib.mixin.client;
 
 import com.p1nero.cceib.client.battle.BattleCameraController;
+import com.p1nero.cceib.config.ClientConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(Camera.class)
 public abstract class CameraMixin {
@@ -48,8 +49,14 @@ public abstract class CameraMixin {
 
         setPosition(transform.getPivot());
         setRotation(transform.getYaw(), transform.getPitch());
-        float safeDistance = cobblemoncinematics$getMaxZoom(transform.getDistance());
-        float resolvedDistance = BattleCameraController.resolveCollisionDistance(safeDistance);
-        move(-resolvedDistance, 0.0F, 0.0F);
+        if (ClientConfig.INSTANCE.getFadeOccludingBlocks().get()) {
+            // The boom keeps its framing; whatever stands in the way is faded by the occlusion
+            // fader instead of pushing the camera around.
+            move(-transform.getDistance(), 0.0F, 0.0F);
+        } else {
+            // Fading is off, so fall back to pulling the boom in against walls.
+            float safeDistance = cobblemoncinematics$getMaxZoom(transform.getDistance());
+            move(-BattleCameraController.resolveCollisionDistance(safeDistance), 0.0F, 0.0F);
+        }
     }
 }

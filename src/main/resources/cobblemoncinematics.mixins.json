@@ -7,6 +7,9 @@
   ],
   "client": [
     "client.CameraMixin",
+    "client.RenderChunkRegionMixin",
+    "client.SectionCompilerMixin",
+    "client.SectionCompilerInvoker",
     "client.BattleGuiMixin",
     "client.BattleMessageHandlerMixin"
   ],
