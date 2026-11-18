@@ -2,6 +2,11 @@
 
 All notable changes to Cobblemon Cinematics are documented here.
 
+## [1.4.0] - 2026-11-18
+
+- Added support for Cobblemon 1.8.x while retaining support for 1.7.3 on NeoForge for Minecraft 1.21.1; development now uses Cobblemon 1.8.4.
+- Updated the optional Mega Showdown development fixture to the build for Cobblemon 1.8.4.
+
 ## [1.3.1] - 2026-09-09
 
 ### Changed
@@ -144,6 +149,11 @@ All notable changes to Cobblemon Cinematics are documented here.
 - Client startup was verified both with optional integrations installed and with Badge Box, Cobblemon Pokemon Badges, Mega Showdown, and Accessories excluded.
 
 ## 简体中文摘要
+
+### 1.4.0
+
+- 在 Minecraft 1.21.1 NeoForge 上支持 Cobblemon 1.7.3 和 1.8.x，开发依赖更新至 1.8.4。
+- 更新 Mega Showdown 联调依赖至对应版本。
 
 ### 1.3.1
 

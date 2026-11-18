@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-Cobblemon Cinematics 是一个面向 Minecraft 1.21.1、NeoForge 和 Cobblemon 1.7.3 的纯客户端演出模组。它为训练师对战和徽章获得流程增加程序化动画、动态镜头与音效，同时避免打包大型背景序列帧。
+Cobblemon Cinematics 是一个面向 Minecraft 1.21.1、NeoForge 和 Cobblemon 1.7.3 或 1.8.x 的纯客户端演出模组。它为训练师对战和徽章获得流程增加程序化动画、动态镜头与音效，同时避免打包大型背景序列帧。
 
 ## 功能
 
@@ -27,9 +27,9 @@ Cobblemon Cinematics 是一个面向 Minecraft 1.21.1、NeoForge 和 Cobblemon 1
 - Minecraft 1.21.1
 - NeoForge 21.1.x
 - Kotlin for Forge 5.12+
-- Cobblemon 1.7.3
+- Cobblemon 1.7.3 或 1.8.x
 
-Badge Box、Cobblemon Pokemon Badges 和 Mega Showdown 均为可选。徽章物品通过可配置规则识别；Mega Showdown 使用运行时检测，未安装时不会加载或引用其代码。
+Badge Box、Cobblemon Pokemon Badges 和 Mega Showdown 均为可选。徽章物品通过可配置规则识别；如需安装 Mega Showdown，请选择与当前 Cobblemon 版本匹配的构建。
 
 ## 配置
 
@@ -109,7 +109,7 @@ itemMatchers = [
 ./gradlew clean build
 ```
 
-构建产物位于 `build/libs/cobblemoncinematics-<version>.jar`。
+构建产物位于 `build/libs/cobblemoncinematics-neoforge1.21.1-<version>.jar`。
 
 开发环境默认加载可选徽章模组和 Mega Showdown 用于联调。使用以下命令验证完全不安装可选联动模组时的启动：
 

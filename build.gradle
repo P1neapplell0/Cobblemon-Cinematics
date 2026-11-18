@@ -124,7 +124,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 dependencies {
     implementation files('libs/kotlinforforge-5.12.0-all.jar')
-    implementation files('libs/Cobblemon-neoforge-1.7.3+1.21.1.jar')
+    implementation files('libs/Cobblemon-neoforge-1.8.4+1.21.1.jar')
 //    implementation "curse.maven:rctmod-1009534:7913180"
 //    implementation files('libs/rctapi-neoforge-1.21.1-0.15.2-beta.jar')
     runtimeOnly 'dev.architectury:architectury-neoforge:13.0.8'
@@ -136,7 +136,7 @@ dependencies {
     }
 
     if (!project.hasProperty('withoutMegaShowdown')) {
-        runtimeOnly files('libs/mega_showdown-neoforge-1.8.4+1.7.3+1.21.1.jar')
+        runtimeOnly files('libs/mega_showdown-neoforge-1.3.3+1.8.4+1.21.1-release.jar')
         runtimeOnly 'io.wispforest:accessories-neoforge:1.1.0-beta.53+1.21.1'
     }
 }

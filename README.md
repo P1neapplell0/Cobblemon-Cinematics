@@ -2,7 +2,7 @@
 
 English | [简体中文](README_zh_CN.md)
 
-Cobblemon Cinematics is a client-side cinematic mod for Minecraft 1.21.1, NeoForge, and Cobblemon 1.7.3. It adds procedural animation, dynamic cameras, and sound effects to Trainer battles and badge acquisition without bundling large background frame sequences.
+Cobblemon Cinematics is a client-side cinematic mod for Minecraft 1.21.1, NeoForge, and Cobblemon 1.7.3 or 1.8.x. It adds procedural animation, dynamic cameras, and sound effects to Trainer battles and badge acquisition without bundling large background frame sequences.
 
 ## Features
 
@@ -27,9 +27,9 @@ Required:
 - Minecraft 1.21.1
 - NeoForge 21.1.x
 - Kotlin for Forge 5.12+
-- Cobblemon 1.7.3
+- Cobblemon 1.7.3 or 1.8.x
 
-Badge Box, Cobblemon Pokemon Badges, and Mega Showdown are optional. Badge items are recognized through configurable matching rules. Mega Showdown is detected at runtime and is not loaded or referenced when absent.
+Badge Box, Cobblemon Pokemon Badges, and Mega Showdown are optional. Badge items are recognized through configurable matching rules. If you install Mega Showdown, choose a build for your Cobblemon version.
 
 ## Configuration
 
@@ -109,7 +109,7 @@ The four gimmick commands also accept an optional species ID, for example `/cobb
 ./gradlew clean build
 ```
 
-The resulting JAR is written to `build/libs/cobblemoncinematics-<version>.jar`.
+The resulting JAR is written to `build/libs/cobblemoncinematics-neoforge1.21.1-<version>.jar`.
 
 The development environment loads the optional badge mods and Mega Showdown by default for integration testing. Use the following command to verify startup without any optional integration mod:
 
